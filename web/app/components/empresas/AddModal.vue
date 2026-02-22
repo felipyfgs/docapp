@@ -1,14 +1,56 @@
 <script setup lang="ts">
 import * as z from 'zod'
 import type { FormSubmitEvent } from '@nuxt/ui'
+import type { Empresa } from '~/types'
 
-const emit = defineEmits<{ created: [] }>()
+const props = defineProps<{
+  empresa?: Empresa | null
+}>()
+
+const emit = defineEmits<{ created: []; updated: []; close: [] }>()
 
 const open = ref(false)
 const toast = useToast()
 const loadingCNPJ = ref(false)
 const certFile = ref<File | null>(null)
 const certSenha = ref('')
+
+const isEditMode = computed(() => !!props.empresa)
+const modalTitle = computed(() => isEditMode.value ? 'Editar Empresa' : 'Nova Empresa')
+const submitLabel = computed(() => isEditMode.value ? 'Salvar' : 'Cadastrar')
+
+watch(() => props.empresa, (empresa) => {
+  if (empresa) {
+    Object.assign(state, {
+      cnpj: empresa.cnpj || '',
+      razao_social: empresa.razao_social || '',
+      nome_fantasia: empresa.nome_fantasia || '',
+      situacao_cadastral: empresa.situacao_cadastral || '',
+      logradouro: empresa.logradouro || '',
+      numero: empresa.numero || '',
+      complemento: empresa.complemento || '',
+      bairro: empresa.bairro || '',
+      cep: empresa.cep || '',
+      cidade: empresa.cidade || '',
+      estado: empresa.estado || '',
+      telefone: empresa.telefone || '',
+      email: empresa.email || '',
+      cnae: empresa.cnae || '',
+      porte: empresa.porte || '',
+      natureza_juridica: empresa.natureza_juridica || '',
+      data_inicio_atividade: empresa.data_inicio_atividade || '',
+      lookback_days: empresa.lookback_days || 90
+    })
+    open.value = true
+  }
+})
+
+watch(open, (isOpen) => {
+  if (!isOpen) {
+    resetForm()
+    emit('close')
+  }
+})
 
 function onCertFileChange(e: Event) {
   const input = e.target as HTMLInputElement
@@ -111,37 +153,56 @@ async function buscarCNPJ() {
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    const empresa: any = await $fetch('/api/empresas', { method: 'POST', body: event.data })
+    let empresaId: number | undefined
 
-    if (certFile.value && empresa?.id) {
+    if (isEditMode.value && props.empresa) {
+      await $fetch(`/api/empresas/${props.empresa.id}`, { method: 'PUT', body: event.data })
+      empresaId = props.empresa.id
+      toast.add({ title: 'Empresa atualizada com sucesso', color: 'success' })
+      emit('updated')
+    } else {
+      const empresa: { id: number } = await $fetch('/api/empresas', { method: 'POST', body: event.data })
+      empresaId = empresa.id
+      toast.add({ title: 'Empresa cadastrada com sucesso', color: 'success' })
+      emit('created')
+    }
+
+    if (certFile.value && empresaId) {
       const fd = new FormData()
       fd.append('certificado', certFile.value)
       fd.append('senha', certSenha.value)
-      await $fetch(`/api/empresas/${empresa.id}/certificado`, { method: 'POST', body: fd })
+      await $fetch(`/api/empresas/${empresaId}/certificado`, { method: 'POST', body: fd })
     }
 
-    toast.add({ title: 'Empresa cadastrada com sucesso', color: 'success' })
     open.value = false
-    emit('created')
-    Object.assign(state, { cnpj: '', razao_social: '', nome_fantasia: '', lookback_days: 90 })
-    certFile.value = null
-    certSenha.value = ''
-  } catch (e: any) {
-    const msg = e?.data?.message ?? 'Erro ao cadastrar empresa'
+    resetForm()
+  } catch (e: unknown) {
+    const msg = (e as { data?: { message?: string } })?.data?.message ?? 'Erro ao salvar empresa'
     toast.add({ title: msg, color: 'error' })
   }
+}
+
+function resetForm() {
+  Object.assign(state, {
+    cnpj: '', razao_social: '', nome_fantasia: '', situacao_cadastral: '',
+    logradouro: '', numero: '', complemento: '', bairro: '', cep: '',
+    cidade: '', estado: '', telefone: '', email: '', cnae: '', porte: '',
+    natureza_juridica: '', data_inicio_atividade: '', lookback_days: 90
+  })
+  certFile.value = null
+  certSenha.value = ''
 }
 </script>
 
 <template>
   <UModal
     v-model:open="open"
-    title="Nova Empresa"
-    description="Preencha o CNPJ para preenchimento automático"
+    :title="modalTitle"
+    :description="isEditMode ? 'Edite os dados da empresa' : 'Preencha o CNPJ para preenchimento automático'"
     :dismissible="false"
     :ui="{ content: 'sm:max-w-2xl h-[90vh]', body: 'overflow-y-auto flex-1 min-h-0' }"
   >
-    <UButton label="Nova Empresa" icon="i-lucide-plus" />
+    <UButton v-if="!isEditMode" label="Nova Empresa" icon="i-lucide-plus" />
 
     <template #body>
       <UForm id="empresa-form" :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
@@ -306,8 +367,8 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
 
     <template #footer>
       <div class="flex justify-end gap-2 w-full">
-        <UButton label="Cancelar" color="neutral" variant="subtle" @click="open = false" />
-        <UButton form="empresa-form" label="Cadastrar" color="primary" type="submit" />
+        <UButton label="Cancelar" color="neutral" variant="subtle" @click="open = false; resetForm()" />
+        <UButton form="empresa-form" :label="submitLabel" color="primary" type="submit" />
       </div>
     </template>
   </UModal>

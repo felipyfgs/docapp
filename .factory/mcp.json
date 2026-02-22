@@ -10,6 +10,11 @@
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
       "disabled": true
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://fiscal:fiscal@localhost:5432/fiscal"]
     }
   }
 }

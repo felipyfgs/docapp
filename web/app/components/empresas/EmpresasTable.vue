@@ -1,48 +1,109 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
+import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
 
 const props = defineProps<{
-  data: Empresa[] | null
+  data: Empresa[] | null | undefined
   status: string
 }>()
 
 const emit = defineEmits<{
   delete: [empresa: Empresa]
+  edit: [empresa: Empresa]
+  sync: [empresa: Empresa]
 }>()
+
+const toast = useToast()
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
+const UCheckbox = resolveComponent('UCheckbox')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 
-const table = useTemplateRef('table')
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const table = useTemplateRef<{ tableApi: any }>('table')
 
-const search = ref('')
-
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  if (!q || !props.data) return props.data ?? []
-  return props.data.filter(e =>
-    e.cnpj.includes(q)
-    || e.razao_social.toLowerCase().includes(q)
-    || e.nome_fantasia?.toLowerCase().includes(q)
-    || e.cidade?.toLowerCase().includes(q)
-  )
-})
+const columnFilters = ref<{ id: string, value: string }[]>([])
+const columnVisibility = ref<Record<string, boolean>>({})
+const rowSelection = ref<Record<string, boolean>>({})
 
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 
+const search = defineModel<string>('search', { default: '' })
+const situacaoFilter = defineModel<string>('situacaoFilter', { default: 'all' })
+
+const filtered = computed(() => {
+  const q = search.value.toLowerCase()
+  let result = props.data ?? []
+
+  if (q) {
+    result = result.filter(e =>
+      e.cnpj.includes(q)
+      || e.razao_social.toLowerCase().includes(q)
+      || e.nome_fantasia?.toLowerCase().includes(q)
+      || e.cidade?.toLowerCase().includes(q)
+    )
+  }
+
+  if (situacaoFilter.value && situacaoFilter.value !== 'all') {
+    result = result.filter(e => e.situacao_cadastral === situacaoFilter.value)
+  }
+
+  return result
+})
+
+const selectedRows = computed((): Empresa[] => {
+  if (!table.value?.tableApi) return []
+  return table.value.tableApi.getFilteredSelectedRowModel().rows.map((r: Row<Empresa>) => r.original)
+})
+
+defineExpose({ selectedRows, tableApi: computed(() => table.value?.tableApi) })
+
 function rowItems(row: Row<Empresa>) {
-  return [[{
-    label: 'Deletar',
-    icon: 'i-lucide-trash',
-    color: 'error' as const,
-    onSelect() {
-      emit('delete', row.original)
-    }
-  }]]
+  return [
+    [
+      { type: 'label' as const, label: 'Ações' }
+    ],
+    [
+      {
+        label: 'Editar',
+        icon: 'i-lucide-pencil',
+        onSelect() {
+          emit('edit', row.original)
+        }
+      },
+      {
+        label: 'Copiar CNPJ',
+        icon: 'i-lucide-copy',
+        onSelect() {
+          navigator.clipboard.writeText(row.original.cnpj)
+          toast.add({ title: 'CNPJ copiado', color: 'success' })
+        }
+      }
+    ],
+    [
+      {
+        label: 'Sincronizar',
+        icon: 'i-lucide-refresh-cw',
+        onSelect() {
+          emit('sync', row.original)
+        }
+      }
+    ],
+    [
+      {
+        label: 'Deletar',
+        icon: 'i-lucide-trash',
+        color: 'error' as const,
+        onSelect() {
+          emit('delete', row.original)
+        }
+      }
+    ]
+  ]
 }
 
 function formatCNPJ(cnpj: string): string {
@@ -53,22 +114,96 @@ function formatCNPJ(cnpj: string): string {
 
 const columns: TableColumn<Empresa>[] = [
   {
+    id: 'select',
+    header: ({ table }) =>
+      h(UCheckbox, {
+        'modelValue': table.getIsSomePageRowsSelected()
+          ? 'indeterminate'
+          : table.getIsAllPageRowsSelected(),
+        'onUpdate:modelValue': (value: boolean | 'indeterminate') =>
+          table.toggleAllPageRowsSelected(!!value),
+        'ariaLabel': 'Selecionar todos'
+      }),
+    cell: ({ row }) =>
+      h(UCheckbox, {
+        'modelValue': row.getIsSelected(),
+        'onUpdate:modelValue': (value: boolean | 'indeterminate') => row.toggleSelected(!!value),
+        'ariaLabel': 'Selecionar linha'
+      })
+  },
+  {
     accessorKey: 'cnpj',
-    header: 'CNPJ',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'CNPJ',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => formatCNPJ(row.original.cnpj)
   },
   {
     accessorKey: 'razao_social',
-    header: 'Razão Social'
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Razão Social',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    }
   },
   {
     accessorKey: 'nome_fantasia',
-    header: 'Nome Fantasia',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Nome Fantasia',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => row.original.nome_fantasia || '—'
   },
   {
     accessorKey: 'situacao_cadastral',
-    header: 'Situação',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Situação',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => {
       const s = row.original.situacao_cadastral
       const color = s === 'Ativa' ? 'success' as const : 'warning' as const
@@ -77,7 +212,22 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     id: 'localidade',
-    header: 'Cidade/UF',
+    accessorFn: row => `${row.cidade || ''}${row.estado || ''}`,
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Cidade/UF',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => {
       const { cidade, estado } = row.original
       if (!cidade && !estado) return '—'
@@ -86,8 +236,59 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     accessorKey: 'lookback_days',
-    header: 'Lookback',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Lookback',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => `${row.original.lookback_days}d`
+  },
+  {
+    id: 'certificado',
+    accessorFn: row => row.certificado_status || 'sem_certificado',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Certificado',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
+    cell: ({ row }) => {
+      const status = row.original.certificado_status
+      const colorMap: Record<string, 'error' | 'warning' | 'success' | 'neutral'> = {
+        vencido: 'error',
+        prestes_a_vencer: 'warning',
+        valido: 'success',
+        sem_certificado: 'neutral'
+      }
+      const labelMap: Record<string, string> = {
+        vencido: 'Vencido',
+        prestes_a_vencer: 'Prestes a vencer',
+        valido: 'Válido',
+        sem_certificado: 'Sem certificado'
+      }
+      const color = colorMap[status || 'sem_certificado'] || 'neutral'
+      const label = labelMap[status || 'sem_certificado'] || 'Sem certificado'
+      return h(UBadge, { variant: 'subtle', color }, () => label)
+    }
   },
   {
     id: 'actions',
@@ -105,10 +306,30 @@ const columns: TableColumn<Empresa>[] = [
       )
   }
 ]
+
+function getVisibilityItems() {
+  if (!table.value?.tableApi) return []
+  return table.value.tableApi
+    .getAllColumns()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .filter((column: any) => column.getCanHide())
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    .map((column: any) => ({
+      label: upperFirst(column.id),
+      type: 'checkbox' as const,
+      checked: column.getIsVisible(),
+      onUpdateChecked(checked: boolean) {
+        table.value?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
+      },
+      onSelect(e?: Event) {
+        e?.preventDefault()
+      }
+    }))
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-1.5">
     <UInput
       v-model="search"
       icon="i-lucide-search"
@@ -116,34 +337,68 @@ const columns: TableColumn<Empresa>[] = [
       class="max-w-sm"
     />
 
-    <UTable
-      ref="table"
-      v-model:pagination="pagination"
-      :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
-      :data="filtered"
-      :columns="columns"
-      :loading="status === 'pending'"
-      class="shrink-0"
-      :ui="{
-        base: 'table-fixed border-separate border-spacing-0',
-        thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-        tbody: '[&>tr]:last:[&>td]:border-b-0',
-        th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-        td: 'border-b border-default',
-        separator: 'h-0'
-      }"
-    />
+    <div class="flex flex-wrap items-center gap-1.5">
+      <slot name="actions" :selected-rows="selectedRows" />
 
-    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-      <div class="text-sm text-muted">
-        {{ filtered.length }} empresa{{ filtered.length !== 1 ? 's' : '' }}
-      </div>
-      <UPagination
-        :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-        :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-        :total="filtered.length"
-        @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+      <USelect
+        v-model="situacaoFilter"
+        :items="[
+          { label: 'Todas', value: 'all' },
+          { label: 'Ativa', value: 'Ativa' },
+          { label: 'Baixada', value: 'Baixada' },
+          { label: 'Suspensa', value: 'Suspensa' },
+          { label: 'Inapta', value: 'Inapta' }
+        ]"
+        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+        placeholder="Situação"
+        class="min-w-28"
       />
+
+      <UDropdownMenu
+        :items="getVisibilityItems()"
+        :content="{ align: 'end' }"
+      >
+        <UButton
+          label="Exibir"
+          color="neutral"
+          variant="outline"
+          trailing-icon="i-lucide-settings-2"
+        />
+      </UDropdownMenu>
     </div>
+  </div>
+
+  <UTable
+    ref="table"
+    v-model:column-filters="columnFilters"
+    v-model:column-visibility="columnVisibility"
+    v-model:row-selection="rowSelection"
+    v-model:pagination="pagination"
+    :pagination-options="{ getPaginationRowModel: getPaginationRowModel() }"
+    :data="filtered"
+    :columns="columns"
+    :loading="status === 'pending'"
+    class="shrink-0"
+    :ui="{
+      base: 'table-fixed border-separate border-spacing-0',
+      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
+      tbody: '[&>tr]:last:[&>td]:border-b-0',
+      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+      td: 'border-b border-default',
+      separator: 'h-0'
+    }"
+  />
+
+  <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
+    <div class="text-sm text-muted">
+      {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} de
+      {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} linha(s) selecionada(s).
+    </div>
+    <UPagination
+      :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+      :items-per-page="table?.tableApi?.getState().pagination.pageSize"
+      :total="table?.tableApi?.getFilteredRowModel().rows.length"
+      @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
+    />
   </div>
 </template>

@@ -82,5 +82,7 @@ export interface Empresa {
   ativo: boolean
   certificado_caminho?: string
   certificado_senha?: string
+  certificado_valido_ate?: string
+  certificado_status?: 'vencido' | 'prestes_a_vencer' | 'valido' | 'sem_certificado'
   created_at: string
 }

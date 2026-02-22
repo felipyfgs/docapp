@@ -22,6 +22,26 @@ type EmpresaHandler struct {
 	log         zerolog.Logger
 }
 
+type EmpresaResponse struct {
+	model.Empresa
+	CertificadoStatus string `json:"certificado_status"`
+}
+
+func toEmpresaResponse(e model.Empresa) EmpresaResponse {
+	return EmpresaResponse{
+		Empresa:           e,
+		CertificadoStatus: e.CertificadoStatus(),
+	}
+}
+
+func toEmpresaResponses(empresas []model.Empresa) []EmpresaResponse {
+	result := make([]EmpresaResponse, len(empresas))
+	for i, e := range empresas {
+		result[i] = toEmpresaResponse(e)
+	}
+	return result
+}
+
 func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, log zerolog.Logger) *EmpresaHandler {
 	return &EmpresaHandler{svc: svc, syncService: syncService, log: log}
 }
@@ -34,7 +54,7 @@ func (h *EmpresaHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, empresas)
+	writeJSON(w, http.StatusOK, toEmpresaResponses(empresas))
 }
 
 func (h *EmpresaHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +105,7 @@ func (h *EmpresaHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, empresa)
+	writeJSON(w, http.StatusOK, toEmpresaResponse(*empresa))
 }
 
 func (h *EmpresaHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -113,7 +133,7 @@ func (h *EmpresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, empresa)
+	writeJSON(w, http.StatusOK, toEmpresaResponse(*empresa))
 }
 
 func (h *EmpresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +203,7 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 	}
 
 	updated, _ := h.svc.GetByID(id)
-	writeJSON(w, http.StatusOK, updated)
+	writeJSON(w, http.StatusOK, toEmpresaResponse(*updated))
 }
 
 func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {

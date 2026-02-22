@@ -6,6 +6,7 @@ import (
 
 	"docapp/core/internal/config"
 	"docapp/core/internal/server"
+	"docapp/core/internal/service"
 )
 
 func main() {
@@ -15,6 +16,11 @@ func main() {
 	db, err := config.ConnectDB(cfg.DatabaseURL, log)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to database")
+	}
+
+	empresaSvc := service.NewEmpresaService(db)
+	if err := empresaSvc.AtualizarValidadeCertificados(); err != nil {
+		log.Warn().Err(err).Msg("failed to update certificate validity")
 	}
 
 	srv := server.New(cfg, db, log)
