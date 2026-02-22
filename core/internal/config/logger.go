@@ -1,4 +1,4 @@
-package logger
+package config
 
 import (
 	"os"
@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func New(env string) zerolog.Logger {
+func NewLogger(env string) zerolog.Logger {
 	zerolog.TimeFieldFormat = time.RFC3339
 
 	if env == "development" {

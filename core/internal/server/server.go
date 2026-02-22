@@ -7,7 +7,6 @@ import (
 	"docapp/core/internal/client"
 	"docapp/core/internal/config"
 	"docapp/core/internal/handler"
-	"docapp/core/internal/router"
 	"docapp/core/internal/service"
 
 	"github.com/go-chi/chi/v5"
@@ -24,7 +23,8 @@ func New(cfg *config.Config, db *gorm.DB, log zerolog.Logger) *Server {
 	c := client.New(cfg.SpedServiceURL, cfg.SpedTimeoutSeconds)
 
 	empresaService := service.NewEmpresaService(db)
-	empresaHandler := handler.NewEmpresaHandler(empresaService, log, cfg.CertsDir)
+	syncService := service.NewSyncService(db, c, log)
+	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, log)
 	cnpjHandler := handler.NewCNPJHandler(log)
 
 	r := chi.NewRouter()

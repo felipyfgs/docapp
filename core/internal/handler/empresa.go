@@ -3,11 +3,8 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -20,13 +17,13 @@ import (
 )
 
 type EmpresaHandler struct {
-	svc      *service.EmpresaService
-	log      zerolog.Logger
-	certsDir string
+	svc         *service.EmpresaService
+	syncService *service.SyncService
+	log         zerolog.Logger
 }
 
-func NewEmpresaHandler(svc *service.EmpresaService, log zerolog.Logger, certsDir string) *EmpresaHandler {
-	return &EmpresaHandler{svc: svc, log: log, certsDir: certsDir}
+func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, log zerolog.Logger) *EmpresaHandler {
+	return &EmpresaHandler{svc: svc, syncService: syncService, log: log}
 }
 
 func (h *EmpresaHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -142,7 +139,7 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	empresa, err := h.svc.GetByID(id)
+	_, err = h.svc.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
@@ -166,31 +163,20 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 	defer file.Close()
 
 	senha := r.FormValue("senha")
-
-	if err := os.MkdirAll(h.certsDir, 0750); err != nil {
-		h.log.Error().Err(err).Str("dir", h.certsDir).Msg("failed to create certs dir")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao criar diretório de certificados."})
-		return
+	siglaUF := r.FormValue("sigla_uf")
+	tpAmb := 1
+	if r.FormValue("tp_amb") == "2" {
+		tpAmb = 2
 	}
 
-	filename := fmt.Sprintf("%s.pfx", empresa.CNPJ)
-	dest := filepath.Join(h.certsDir, filename)
-
-	out, err := os.Create(dest)
+	pfxData, err := io.ReadAll(file)
 	if err != nil {
-		h.log.Error().Err(err).Str("dest", dest).Msg("failed to create cert file")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao salvar certificado."})
-		return
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, file); err != nil {
-		h.log.Error().Err(err).Msg("failed to write cert file")
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao escrever certificado."})
+		h.log.Error().Err(err).Msg("failed to read cert file")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao ler certificado."})
 		return
 	}
 
-	if err := h.svc.UpdateCertificado(id, dest, senha); err != nil {
+	if err := h.svc.UpdateCertificadoPFX(id, pfxData, senha, siglaUF, tpAmb); err != nil {
 		h.log.Error().Err(err).Uint("id", id).Msg("update certificado failed")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao atualizar certificado na empresa."})
 		return
@@ -198,6 +184,41 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 
 	updated, _ := h.svc.GetByID(id)
 	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "ID inválido."})
+		return
+	}
+
+	empresa, err := h.svc.GetByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
+			return
+		}
+		h.log.Error().Err(err).Uint("id", id).Msg("get empresa for sync failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao buscar empresa."})
+		return
+	}
+
+	if len(empresa.CertificadoPFX) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Empresa sem certificado configurado."})
+		return
+	}
+
+	if err := h.syncService.SyncEmpresa(*empresa); err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("sync failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"message": "Erro ao sincronizar empresa.",
+			"error":   err.Error(),
+		})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Sincronização concluída."})
 }
 
 func parseID(r *http.Request) (uint, error) {

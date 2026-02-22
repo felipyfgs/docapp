@@ -1,4 +1,4 @@
-package database
+package config
 
 import (
 	"docapp/core/internal/model"
@@ -9,7 +9,7 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 )
 
-func Connect(dsn string, log zerolog.Logger) (*gorm.DB, error) {
+func ConnectDB(dsn string, log zerolog.Logger) (*gorm.DB, error) {
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: gormlogger.Default.LogMode(gormlogger.Warn),
 	})

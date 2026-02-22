@@ -32,11 +32,14 @@ type Empresa struct {
 	Porte               string     `                                         json:"porte"`
 	NaturezaJuridica    string     `                                         json:"natureza_juridica"`
 	DataInicioAtividade string     `                                         json:"data_inicio_atividade"`
-	LookbackDays            int    `gorm:"default:90"                        json:"lookback_days"`
-	UltNSU                  string `gorm:"default:'000000000000000'"         json:"ult_nsu"`
-	Ativo                   bool   `gorm:"default:true"                      json:"ativo"`
-	CertificadoCaminho      string `                                         json:"certificado_caminho"`
-	CertificadoSenha        string `                                         json:"certificado_senha"`
+	LookbackDays        int        `gorm:"default:90"                json:"lookback_days"`
+	UltNSU              string     `gorm:"default:'000000000000000'" json:"ult_nsu"`
+	Ativo               bool       `gorm:"default:true"              json:"ativo"`
+	CertificadoPFX      []byte     `gorm:"type:bytea"                json:"-"`
+	CertificadoSenha    string     `                                 json:"-"`
+	SiglaUF             string     `gorm:"size:2"                    json:"sigla_uf"`
+	TpAmb               int        `gorm:"default:1"                 json:"tp_amb"`
+	UltimaSincronizacao *time.Time `                                 json:"ultima_sincronizacao"`
 }
 
 type DocumentoFiscal struct {
