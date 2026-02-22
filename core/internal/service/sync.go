@@ -8,7 +8,6 @@ import (
 
 	"docapp/core/internal/client"
 	"docapp/core/internal/model"
-	"docapp/core/internal/sefaz"
 
 	"github.com/rs/zerolog"
 	"gorm.io/gorm"
@@ -25,7 +24,7 @@ type SyncService struct {
 	db          *gorm.DB
 	client      *client.Client
 	log         zerolog.Logger
-	rateLimiter *sefaz.RateLimiter
+	rateLimiter *RateLimiter
 }
 
 func NewSyncService(db *gorm.DB, c *client.Client, log zerolog.Logger) *SyncService {
@@ -33,7 +32,7 @@ func NewSyncService(db *gorm.DB, c *client.Client, log zerolog.Logger) *SyncServ
 		db:          db,
 		client:      c,
 		log:         log,
-		rateLimiter: sefaz.NewRateLimiter(20),
+		rateLimiter: NewRateLimiter(20),
 	}
 }
 
@@ -98,7 +97,7 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 			break
 		}
 
-		parsed, err := sefaz.ParseDistDFeResponse(resp.RawXML)
+		parsed, err := ParseDistDFeResponse(resp.RawXML)
 		if err != nil {
 			return fmt.Errorf("parsing sefaz response: %w", err)
 		}

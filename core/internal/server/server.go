@@ -31,7 +31,7 @@ func New(cfg *config.Config, db *gorm.DB, log zerolog.Logger) *Server {
 	r.Use(requestLogger(log))
 	r.Use(middleware.Recoverer)
 
-	router.RegisterRoutes(r, c, empresaHandler, cnpjHandler)
+	RegisterRoutes(r, c, empresaHandler, cnpjHandler)
 
 	return &Server{router: r}
 }
