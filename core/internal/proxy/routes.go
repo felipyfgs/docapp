@@ -1,4 +1,4 @@
-package spedproxy
+package proxy
 
 import (
 	"context"
@@ -7,17 +7,17 @@ import (
 	"net/http"
 	"strings"
 
-	"docapp/core/internal/spedclient"
+	"docapp/core/internal/client"
 
 	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {
-	client *spedclient.Client
+	client *client.Client
 }
 
-func RegisterRoutes(r chi.Router, client *spedclient.Client) {
-	h := &Handler{client: client}
+func RegisterRoutes(r chi.Router, c *client.Client) {
+	h := &Handler{client: c}
 
 	r.Route("/fiscal", func(r chi.Router) {
 		r.Get("/health", h.handleHealth)

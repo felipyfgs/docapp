@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"time"
 
+	"docapp/core/internal/client"
 	"docapp/core/internal/config"
-	"docapp/core/internal/spedclient"
-	"docapp/core/internal/spedproxy"
+	"docapp/core/internal/proxy"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -16,13 +16,13 @@ import (
 type Server struct {
 	cfg        *config.Config
 	router     chi.Router
-	spedClient *spedclient.Client
+	spedClient *client.Client
 }
 
 func New(cfg *config.Config) *Server {
 	s := &Server{
 		cfg:        cfg,
-		spedClient: spedclient.New(cfg.SpedServiceURL, time.Duration(cfg.SpedTimeoutSeconds)*time.Second),
+		spedClient: client.New(cfg.SpedServiceURL, time.Duration(cfg.SpedTimeoutSeconds)*time.Second),
 	}
 	s.setupRoutes()
 	return s
@@ -42,7 +42,7 @@ func (s *Server) setupRoutes() {
 	r.Get("/health", s.handleHealth)
 
 	r.Route("/api/v1", func(r chi.Router) {
-		spedproxy.RegisterRoutes(r, s.spedClient)
+		proxy.RegisterRoutes(r, s.spedClient)
 	})
 
 	s.router = r

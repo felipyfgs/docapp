@@ -1,4 +1,4 @@
-package spedclient
+package client
 
 import (
 	"bytes"
