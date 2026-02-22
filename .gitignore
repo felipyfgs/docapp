@@ -1,0 +1,55 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+.fleet/
+.zed/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Go
+core/vendor/
+core/bin/
+
+# PHP / Laravel (sped)
+sped/vendor/
+sped/.env
+sped/storage/certs/*.pfx
+sped/storage/certs/*.pem
+sped/storage/certs/*.crt
+sped/storage/certs/*.json
+sped/storage/*.key
+sped/storage/logs/
+sped/storage/framework/cache/
+sped/storage/framework/sessions/
+sped/storage/framework/views/
+sped/bootstrap/cache/
+sped/public/build/
+sped/public/hot/
+sped/public/storage/
+sped/.phpunit.cache
+sped/.phpunit.result.cache
+sped/auth.json
+
+# Node / Nuxt (web)
+web/node_modules/
+web/.nuxt/
+web/.output/
+web/.nitro/
+web/.cache/
+web/dist/
+web/logs/
+
+# Certificates at root
+core/certs/*.pfx
+core/certs/*.pem
+core/certs/*.crt
+core/certs/*.p12

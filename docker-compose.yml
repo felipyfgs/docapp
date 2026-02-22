@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fiscal
+      POSTGRES_USER: fiscal
+      POSTGRES_PASSWORD: fiscal
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fiscal -d fiscal"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sped:
+    build:
+      context: ./sped
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_URL=http://localhost:8000
+      - LOG_CHANNEL=stderr
+      - LOG_LEVEL=info
+      - DB_CONNECTION=sqlite
+      - CACHE_STORE=file
+      - SESSION_DRIVER=array
+      - QUEUE_CONNECTION=sync
+      - FISCAL_CERTS_PATH=storage/certs
+      - SEFAZ_DOWNLOAD_LIMIT_PER_HOUR=20
+      - SEFAZ_DISTDFE_MAX_LOOPS=12
+      - SEFAZ_DISTDFE_SLEEP_SECONDS=2
+      - SEFAZ_RETRY_AFTER_SECONDS=3600
+    volumes:
+      - sped_storage:/var/www/html/storage
+
+volumes:
+  postgres_data:
+  sped_storage:
