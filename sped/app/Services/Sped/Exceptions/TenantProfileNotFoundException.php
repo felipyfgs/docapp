@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\Sped\ceptions;
+namespace App\Services\Sped\Exceptions;
 
 use RuntimeException;
 

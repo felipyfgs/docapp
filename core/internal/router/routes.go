@@ -33,6 +33,7 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 		r.Get("/{id}", empresa.GetByID)
 		r.Put("/{id}", empresa.Update)
 		r.Delete("/{id}", empresa.Delete)
+		r.Post("/{id}/certificado", empresa.UploadCertificado)
 	})
 
 	r.Get("/cnpj/{cnpj}", cnpj.Lookup)

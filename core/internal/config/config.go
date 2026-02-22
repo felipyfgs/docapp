@@ -12,6 +12,7 @@ type Config struct {
 	SpedTimeoutSeconds    int
 	DatabaseURL           string
 	WorkerIntervalMinutes int
+	CertsDir              string
 }
 
 func Load() *Config {
@@ -19,9 +20,10 @@ func Load() *Config {
 		Port:                  getEnv("PORT", "8080"),
 		Env:                   getEnv("ENV", "development"),
 		SpedServiceURL:        getEnv("SPED_SERVICE_URL", "http://sped:8000"),
-		SpedTimeoutSeconds:    getEnvInt("SPED_TIMEOUT_SECONDS", 15),
+		SpedTimeoutSeconds:    getEnvInt("SPED_TIMEOUT_SECONDS", 180),
 		DatabaseURL:           getEnv("DATABASE_URL", "postgres://fiscal:fiscal@localhost:5432/fiscal?sslmode=disable"),
 		WorkerIntervalMinutes: getEnvInt("WORKER_INTERVAL_MINUTES", 30),
+		CertsDir:              getEnv("CERTS_DIR", "certs"),
 	}
 }
 

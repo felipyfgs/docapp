@@ -7,6 +7,13 @@ const emit = defineEmits<{ created: [] }>()
 const open = ref(false)
 const toast = useToast()
 const loadingCNPJ = ref(false)
+const certFile = ref<File | null>(null)
+const certSenha = ref('')
+
+function onCertFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  certFile.value = input.files?.[0] ?? null
+}
 
 const schema = z.object({
   cnpj: z.string().regex(/^\d{14}$/, 'CNPJ deve conter 14 dígitos'),
@@ -104,15 +111,24 @@ async function buscarCNPJ() {
 
 async function onSubmit(event: FormSubmitEvent<Schema>) {
   try {
-    await $fetch('/api/empresas', { method: 'POST', body: event.data })
+    const empresa: any = await $fetch('/api/empresas', { method: 'POST', body: event.data })
+
+    if (certFile.value && empresa?.id) {
+      const fd = new FormData()
+      fd.append('certificado', certFile.value)
+      fd.append('senha', certSenha.value)
+      await $fetch(`/api/empresas/${empresa.id}/certificado`, { method: 'POST', body: fd })
+    }
+
     toast.add({ title: 'Empresa cadastrada com sucesso', color: 'success' })
     open.value = false
     emit('created')
-    Object.assign(state, {
-      cnpj: '', razao_social: '', nome_fantasia: '', lookback_days: 90
-    })
-  } catch {
-    toast.add({ title: 'Erro ao cadastrar empresa', color: 'error' })
+    Object.assign(state, { cnpj: '', razao_social: '', nome_fantasia: '', lookback_days: 90 })
+    certFile.value = null
+    certSenha.value = ''
+  } catch (e: any) {
+    const msg = e?.data?.message ?? 'Erro ao cadastrar empresa'
+    toast.add({ title: msg, color: 'error' })
   }
 }
 </script>
@@ -150,21 +166,21 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           </div>
         </UFormField>
 
-        <!-- Secoes organizadas em accordion -->
-        <UAccordion
-          type="multiple"
+        <!-- Secoes organizadas em tabs -->
+        <UTabs
           :unmount-on-hide="false"
-          :default-value="['identificacao']"
+          color="neutral"
+          variant="link"
           :items="[
-            { label: 'Identificação', value: 'identificacao', icon: 'i-lucide-building-2', slot: 'identificacao' },
-            { label: 'Endereço', value: 'endereco', icon: 'i-lucide-map-pin', slot: 'endereco' },
-            { label: 'Contato', value: 'contato', icon: 'i-lucide-phone', slot: 'contato' },
-            { label: 'Dados Fiscais', value: 'fiscal', icon: 'i-lucide-file-text', slot: 'fiscal' },
-            { label: 'Configuração', value: 'configuracao', icon: 'i-lucide-settings-2', slot: 'configuracao' }
+            { label: 'Identificação', icon: 'i-lucide-building-2', slot: 'identificacao' },
+            { label: 'Endereço',      icon: 'i-lucide-map-pin',    slot: 'endereco' },
+            { label: 'Contato',       icon: 'i-lucide-phone',      slot: 'contato' },
+            { label: 'Fiscal',        icon: 'i-lucide-file-text',  slot: 'fiscal' },
+            { label: 'Configuração',  icon: 'i-lucide-settings-2', slot: 'configuracao' }
           ]"
         >
           <template #identificacao>
-            <div class="grid grid-cols-2 gap-4 px-1 pb-3">
+            <div class="grid grid-cols-2 gap-4 pt-4">
               <UFormField label="Razão Social" name="razao_social" required class="col-span-2">
                 <UInput v-model="state.razao_social" class="w-full" />
               </UFormField>
@@ -181,7 +197,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           </template>
 
           <template #endereco>
-            <div class="grid grid-cols-2 gap-4 px-1 pb-3">
+            <div class="grid grid-cols-2 gap-4 pt-4">
               <UFormField label="Logradouro" name="logradouro" class="col-span-2">
                 <UInput v-model="state.logradouro" class="w-full" />
               </UFormField>
@@ -207,7 +223,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           </template>
 
           <template #contato>
-            <div class="grid grid-cols-2 gap-4 px-1 pb-3">
+            <div class="grid grid-cols-2 gap-4 pt-4">
               <UFormField label="Telefone" name="telefone">
                 <UInput v-model="state.telefone" class="w-full" />
               </UFormField>
@@ -218,7 +234,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           </template>
 
           <template #fiscal>
-            <div class="grid grid-cols-2 gap-4 px-1 pb-3">
+            <div class="grid grid-cols-2 gap-4 pt-4">
               <UFormField label="CNAE Principal" name="cnae">
                 <UInput v-model="state.cnae" class="w-full" />
               </UFormField>
@@ -232,7 +248,7 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
           </template>
 
           <template #configuracao>
-            <div class="px-1 pb-3">
+            <div class="flex flex-col gap-4 pt-4">
               <UFormField
                 label="Lookback (dias)"
                 name="lookback_days"
@@ -245,9 +261,45 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
                   class="w-full"
                 />
               </UFormField>
+
+              <div class="border border-default rounded-lg p-4 flex flex-col gap-3">
+                <p class="text-sm font-medium text-highlighted flex items-center gap-1.5">
+                  <UIcon name="i-lucide-shield-check" class="size-4" />
+                  Certificado Digital (A1)
+                </p>
+                <div class="flex items-center gap-2">
+                  <label
+                    class="flex-1 flex items-center gap-2 px-3 py-2 rounded-md border border-default bg-default text-sm text-muted cursor-pointer hover:bg-elevated transition-colors"
+                  >
+                    <UIcon name="i-lucide-upload" class="size-4 shrink-0" />
+                    <span class="truncate">{{ certFile ? certFile.name : 'Selecionar arquivo .pfx' }}</span>
+                    <input
+                      type="file"
+                      accept=".pfx,.p12"
+                      class="sr-only"
+                      @change="onCertFileChange"
+                    />
+                  </label>
+                  <UButton
+                    v-if="certFile"
+                    icon="i-lucide-x"
+                    color="neutral"
+                    variant="ghost"
+                    size="sm"
+                    @click="certFile = null"
+                  />
+                </div>
+                <UInput
+                  v-if="certFile"
+                  v-model="certSenha"
+                  type="password"
+                  placeholder="Senha do certificado"
+                  class="w-full"
+                />
+              </div>
             </div>
           </template>
-        </UAccordion>
+        </UTabs>
 
       </UForm>
     </template>

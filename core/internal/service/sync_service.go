@@ -27,9 +27,9 @@ func NewSyncService(db *gorm.DB, c *client.Client, log zerolog.Logger) *SyncServ
 
 func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 	payload, err := json.Marshal(map[string]any{
-		"tenant":      strings.ReplaceAll(empresa.CNPJ, "/", ""),
+		"tenant":      empresa.CNPJ,
 		"ult_nsu":     empresa.UltNSU,
-		"max_loops":   12,
+		"max_loops":   50,
 		"include_xml": true,
 	})
 	if err != nil {
@@ -40,6 +40,8 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 	if err != nil {
 		return fmt.Errorf("calling distdfe: %w", err)
 	}
+
+	s.log.Debug().RawJSON("response", body).Msg("raw response from sped")
 
 	var result struct {
 		UltNSU    string           `json:"ult_nsu"`

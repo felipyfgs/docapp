@@ -80,5 +80,7 @@ export interface Empresa {
   data_inicio_atividade?: string
   lookback_days: number
   ativo: boolean
+  certificado_caminho?: string
+  certificado_senha?: string
   created_at: string
 }

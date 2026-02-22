@@ -24,7 +24,7 @@ func New(cfg *config.Config, db *gorm.DB, log zerolog.Logger) *Server {
 	c := client.New(cfg.SpedServiceURL, cfg.SpedTimeoutSeconds)
 
 	empresaService := service.NewEmpresaService(db)
-	empresaHandler := handler.NewEmpresaHandler(empresaService, log)
+	empresaHandler := handler.NewEmpresaHandler(empresaService, log, cfg.CertsDir)
 	cnpjHandler := handler.NewCNPJHandler(log)
 
 	r := chi.NewRouter()

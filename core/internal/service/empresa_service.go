@@ -51,7 +51,7 @@ func (s *EmpresaService) Update(id uint, updates *model.Empresa) (*model.Empresa
 }
 
 func (s *EmpresaService) Delete(id uint) error {
-	return s.db.Delete(&model.Empresa{}, id).Error
+	return s.db.Unscoped().Delete(&model.Empresa{}, id).Error
 }
 
 func (s *EmpresaService) ListAtivas() ([]model.Empresa, error) {
@@ -65,4 +65,11 @@ func (s *EmpresaService) ListAtivas() ([]model.Empresa, error) {
 
 func (s *EmpresaService) UpdateUltNSU(id uint, ultNSU string) error {
 	return s.db.Model(&model.Empresa{}).Where("id = ?", id).Update("ult_nsu", ultNSU).Error
+}
+
+func (s *EmpresaService) UpdateCertificado(id uint, caminho, senha string) error {
+	return s.db.Model(&model.Empresa{}).Where("id = ?", id).Updates(map[string]any{
+		"certificado_caminho": caminho,
+		"certificado_senha":   senha,
+	}).Error
 }
