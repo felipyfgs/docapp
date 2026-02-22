@@ -2,22 +2,29 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 
 	"docapp/core/internal/config"
+	"docapp/core/internal/database"
+	"docapp/core/internal/logger"
 	"docapp/core/internal/server"
 )
 
 func main() {
 	cfg := config.Load()
+	log := logger.New(cfg.Env)
 
-	srv := server.New(cfg)
+	db, err := database.Connect(cfg.DatabaseURL, log)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to connect to database")
+	}
+
+	srv := server.New(cfg, db, log)
 
 	addr := fmt.Sprintf(":%s", cfg.Port)
-	log.Printf("Server starting on %s", addr)
+	log.Info().Str("addr", addr).Msg("server starting")
 
 	if err := http.ListenAndServe(addr, srv.Router()); err != nil {
-		log.Fatalf("Server failed to start: %v", err)
+		log.Fatal().Err(err).Msg("server failed to start")
 	}
 }

@@ -8,16 +8,17 @@ import (
 	"strings"
 
 	"docapp/core/internal/client"
+	"docapp/core/internal/handler"
 
 	"github.com/go-chi/chi/v5"
 )
 
-type Handler struct {
+type proxyHandler struct {
 	client *client.Client
 }
 
-func RegisterRoutes(r chi.Router, c *client.Client) {
-	h := &Handler{client: c}
+func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHandler, cnpj *handler.CNPJHandler) {
+	h := &proxyHandler{client: c}
 
 	r.Route("/fiscal", func(r chi.Router) {
 		r.Get("/health", h.handleHealth)
@@ -25,9 +26,19 @@ func RegisterRoutes(r chi.Router, c *client.Client) {
 		r.Post("/download", h.handleDownloadByKey)
 		r.Post("/consulta-chave", h.handleConsultaChave)
 	})
+
+	r.Route("/empresas", func(r chi.Router) {
+		r.Get("/", empresa.List)
+		r.Post("/", empresa.Create)
+		r.Get("/{id}", empresa.GetByID)
+		r.Put("/{id}", empresa.Update)
+		r.Delete("/{id}", empresa.Delete)
+	})
+
+	r.Get("/cnpj/{cnpj}", cnpj.Lookup)
 }
 
-func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (h *proxyHandler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	status, body, err := h.client.Health(r.Context())
 	if err != nil {
 		h.writeProxyError(w, err)
@@ -42,19 +53,19 @@ func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	h.writeResponse(w, status, body, contentType)
 }
 
-func (h *Handler) handleDistDFe(w http.ResponseWriter, r *http.Request) {
+func (h *proxyHandler) handleDistDFe(w http.ResponseWriter, r *http.Request) {
 	h.forwardPost(w, r, h.client.DistDFe)
 }
 
-func (h *Handler) handleDownloadByKey(w http.ResponseWriter, r *http.Request) {
+func (h *proxyHandler) handleDownloadByKey(w http.ResponseWriter, r *http.Request) {
 	h.forwardPost(w, r, h.client.DownloadByKey)
 }
 
-func (h *Handler) handleConsultaChave(w http.ResponseWriter, r *http.Request) {
+func (h *proxyHandler) handleConsultaChave(w http.ResponseWriter, r *http.Request) {
 	h.forwardPost(w, r, h.client.ConsultaChave)
 }
 
-func (h *Handler) forwardPost(
+func (h *proxyHandler) forwardPost(
 	w http.ResponseWriter,
 	r *http.Request,
 	fn func(ctx context.Context, payload []byte) (int, []byte, error),
@@ -81,14 +92,14 @@ func (h *Handler) forwardPost(
 	h.writeResponse(w, status, body, "application/json")
 }
 
-func (h *Handler) writeProxyError(w http.ResponseWriter, err error) {
+func (h *proxyHandler) writeProxyError(w http.ResponseWriter, err error) {
 	h.writeResponse(w, http.StatusBadGateway, mustJSON(map[string]string{
 		"message": "Falha ao chamar microserviço SPED.",
 		"error":   err.Error(),
 	}), "application/json")
 }
 
-func (h *Handler) writeResponse(w http.ResponseWriter, status int, body []byte, contentType string) {
+func (h *proxyHandler) writeResponse(w http.ResponseWriter, status int, body []byte, contentType string) {
 	w.Header().Set("Content-Type", contentType)
 	w.WriteHeader(status)
 	_, _ = w.Write(body)

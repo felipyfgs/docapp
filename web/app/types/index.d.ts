@@ -58,3 +58,27 @@ export interface Range {
   start: Date
   end: Date
 }
+
+export interface Empresa {
+  id: number
+  cnpj: string
+  razao_social: string
+  nome_fantasia: string
+  situacao_cadastral: string
+  logradouro: string
+  numero: string
+  complemento?: string
+  bairro: string
+  cep: string
+  cidade: string
+  estado: string
+  telefone?: string
+  email?: string
+  cnae?: string
+  porte?: string
+  natureza_juridica?: string
+  data_inicio_atividade?: string
+  lookback_days: number
+  ativo: boolean
+  created_at: string
+}

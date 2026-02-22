@@ -1,0 +1,1 @@
+esse serviço roda local nao deve conter serviço dle no docker compose

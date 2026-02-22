@@ -12,9 +12,25 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  runtimeConfig: {
+    coreApiUrl: process.env.CORE_API_URL || 'http://localhost:8080'
+  },
+
   routeRules: {
     '/api/**': {
       cors: true
+    }
+  },
+
+  vite: {
+    optimizeDeps: {
+      include: [
+        'zod',
+        '@tanstack/table-core',
+        'date-fns',
+        '@vue/devtools-core',
+        '@vue/devtools-kit'
+      ]
     }
   },
 

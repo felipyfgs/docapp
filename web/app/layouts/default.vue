@@ -29,6 +29,13 @@ const links = [[{
     open.value = false
   }
 }, {
+  label: 'Empresas',
+  icon: 'i-lucide-building-2',
+  to: '/empresas',
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Settings',
   to: '/settings',
   icon: 'i-lucide-settings',
