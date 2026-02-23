@@ -6,6 +6,7 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
+        "php": "^8.2",
         "ext-curl": "*",
         "ext-dom": "*",
         "ext-json": "*",
@@ -14,8 +15,8 @@
         "ext-soap": "*",
         "ext-xml": "*",
         "ext-zip": "*",
-        "php": "^8.2",
         "laravel/framework": "^11.31",
+        "nfephp-org/sped-da": "^1.1",
         "nfephp-org/sped-nfe": "^5.1"
     },
     "require-dev": {

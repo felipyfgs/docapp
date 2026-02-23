@@ -58,7 +58,12 @@ const selectedCount = computed(() => tableRef.value?.selectedRows?.length ?? 0)
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <EmpresasAddModal :empresa="empresaToEdit" @created="refresh" @updated="onUpdated" @close="empresaToEdit = null" />
+          <EmpresasAddModal
+            :empresa="empresaToEdit"
+            @created="refresh"
+            @updated="onUpdated"
+            @close="empresaToEdit = null"
+          />
         </template>
       </UDashboardNavbar>
     </template>

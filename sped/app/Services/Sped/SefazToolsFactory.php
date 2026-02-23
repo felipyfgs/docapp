@@ -13,8 +13,7 @@ class SefazToolsFactory
     public function __construct(
         private readonly ConfigProfileLoader $profileLoader,
         private readonly CertificateStore $certificateStore
-    ) {
-    }
+    ) {}
 
     public function make(string $tenant): Tools
     {
@@ -45,7 +44,7 @@ class SefazToolsFactory
     }
 
     /**
-     * @param array<string, mixed> $profile
+     * @param  array<string, mixed>  $profile
      */
     private function buildConfigJson(array $profile): string
     {

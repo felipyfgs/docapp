@@ -9,8 +9,7 @@ class DistDFeService
     public function __construct(
         private readonly SefazToolsFactory $toolsFactory,
         private readonly ResponseMapper $responseMapper
-    ) {
-    }
+    ) {}
 
     /**
      * @return array<string, mixed>

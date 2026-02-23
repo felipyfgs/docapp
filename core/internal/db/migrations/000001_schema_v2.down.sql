@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS documentos_fiscais CASCADE;
+DROP TABLE IF EXISTS empresa_sync_states CASCADE;
+DROP TABLE IF EXISTS empresa_certificados CASCADE;
+DROP TABLE IF EXISTS empresas CASCADE;

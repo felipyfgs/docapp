@@ -14,7 +14,7 @@ class ConfigProfileLoader
         $tenant = $this->sanitizeTenant($tenant);
         $profilePath = $this->profilePath($tenant);
 
-        if (!is_file($profilePath)) {
+        if (! is_file($profilePath)) {
             throw new TenantProfileNotFoundException("Perfil fiscal do tenant '{$tenant}' não encontrado.");
         }
 
@@ -30,7 +30,7 @@ class ConfigProfileLoader
             throw new RuntimeException("Perfil fiscal do tenant '{$tenant}' contém JSON inválido.", 0, $exception);
         }
 
-        if (!is_array($decoded)) {
+        if (! is_array($decoded)) {
             throw new RuntimeException("Perfil fiscal do tenant '{$tenant}' inválido.");
         }
 

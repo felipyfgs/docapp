@@ -36,6 +36,13 @@ const links = [[{
     open.value = false
   }
 }, {
+  label: 'Documentos',
+  icon: 'i-lucide-file-text',
+  to: '/documentos',
+  onSelect: () => {
+    open.value = false
+  }
+}, {
   label: 'Settings',
   to: '/settings',
   icon: 'i-lucide-settings',

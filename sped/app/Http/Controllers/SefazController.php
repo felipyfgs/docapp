@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Sped\DanfeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use NFePHP\Common\Certificate;
 use NFePHP\NFe\Tools;
 
 class SefazController extends Controller
 {
+    public function __construct(
+        private readonly DanfeService $danfeService,
+    ) {}
+
     public function distDFe(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -24,7 +30,7 @@ class SefazController extends Controller
         try {
             $tools = $this->makeTools($validated);
             $ultNsu = $this->normalizeNsu((string) ($validated['ult_nsu'] ?? '0'));
-            
+
             $rawXml = $tools->sefazDistDFe($ultNsu);
 
             return response()->json([
@@ -34,6 +40,7 @@ class SefazController extends Controller
             ]);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
                 'error' => $e->getMessage(),
             ], 500);
@@ -63,6 +70,7 @@ class SefazController extends Controller
             ]);
         } catch (\Throwable $e) {
             report($e);
+
             return response()->json([
                 'error' => $e->getMessage(),
             ], 500);
@@ -92,6 +100,37 @@ class SefazController extends Controller
             ]);
         } catch (\Throwable $e) {
             report($e);
+
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function danfe(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'tipo' => ['required', 'string', Rule::in(['nf-e', 'nfc-e', 'ct-e'])],
+            'xml' => ['required', 'string'],
+        ]);
+
+        try {
+            $pdf = $this->danfeService->generate(
+                (string) $validated['tipo'],
+                (string) $validated['xml'],
+            );
+
+            return response()->json([
+                'pdf_base64' => base64_encode($pdf),
+                'mime_type' => 'application/pdf',
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            report($e);
+
             return response()->json([
                 'error' => $e->getMessage(),
             ], 500);
@@ -133,6 +172,7 @@ class SefazController extends Controller
         if ($trimmed === '') {
             return str_repeat('0', 15);
         }
+
         return str_pad($trimmed, 15, '0', STR_PAD_LEFT);
     }
 
@@ -141,6 +181,7 @@ class SefazController extends Controller
         if (preg_match('/<cStat>(\d+)<\/cStat>/', $xml, $matches)) {
             return $matches[1];
         }
+
         return null;
     }
 
@@ -149,6 +190,7 @@ class SefazController extends Controller
         if (preg_match('/<xMotivo>([^<]+)<\/xMotivo>/', $xml, $matches)) {
             return $matches[1];
         }
+
         return null;
     }
 }

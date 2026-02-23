@@ -16,7 +16,7 @@ class ResponseMapper
         $dom = $this->loadXml($xml);
         $ret = $dom->getElementsByTagName('retDistDFeInt')->item(0);
 
-        if (!$ret instanceof DOMElement) {
+        if (! $ret instanceof DOMElement) {
             throw new RuntimeException('Resposta DistDFe inválida.');
         }
 
@@ -36,7 +36,7 @@ class ResponseMapper
 
         if ($lote instanceof DOMElement) {
             foreach ($lote->getElementsByTagName('docZip') as $docZip) {
-                if (!$docZip instanceof DOMElement) {
+                if (! $docZip instanceof DOMElement) {
                     continue;
                 }
 
@@ -86,7 +86,7 @@ class ResponseMapper
         $dom = $this->loadXml($xml);
         $ret = $dom->getElementsByTagName('retConsSitNFe')->item(0);
 
-        if (!$ret instanceof DOMElement) {
+        if (! $ret instanceof DOMElement) {
             throw new RuntimeException('Resposta de consulta por chave inválida.');
         }
 
@@ -112,11 +112,11 @@ class ResponseMapper
 
     private function loadXml(string $xml): DOMDocument
     {
-        $dom = new DOMDocument();
+        $dom = new DOMDocument;
         $internalErrors = libxml_use_internal_errors(true);
 
         try {
-            if (!$dom->loadXML($xml)) {
+            if (! $dom->loadXML($xml)) {
                 throw new RuntimeException('XML inválido retornado pela SEFAZ.');
             }
         } finally {
@@ -131,7 +131,7 @@ class ResponseMapper
     {
         $node = $context->getElementsByTagName($tagName)->item(0);
 
-        if (!$node) {
+        if (! $node) {
             return null;
         }
 

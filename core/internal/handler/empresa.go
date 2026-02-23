@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	"docapp/core/internal/model"
+	"docapp/core/internal/repository"
 	"docapp/core/internal/service"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
-	"gorm.io/gorm"
 )
 
 type EmpresaHandler struct {
@@ -74,7 +74,8 @@ func (h *EmpresaHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Create(&empresa); err != nil {
-		if strings.Contains(err.Error(), "idx_empresas_cnpj") {
+		errMsg := strings.ToLower(err.Error())
+		if strings.Contains(errMsg, "uq_empresas_cnpj") || strings.Contains(errMsg, "duplicate key") {
 			writeJSON(w, http.StatusConflict, map[string]string{"message": "CNPJ já cadastrado."})
 			return
 		}
@@ -95,7 +96,7 @@ func (h *EmpresaHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 	empresa, err := h.svc.GetByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, repository.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
 			return
 		}
@@ -123,7 +124,7 @@ func (h *EmpresaHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	empresa, err := h.svc.Update(id, &updates)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, repository.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
 			return
 		}
@@ -144,6 +145,11 @@ func (h *EmpresaHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.svc.Delete(id); err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
+			return
+		}
+
 		h.log.Error().Err(err).Uint("id", id).Msg("delete empresa failed")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao deletar empresa."})
 		return
@@ -159,9 +165,9 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	_, err = h.svc.GetByID(id)
+	empresa, err := h.svc.GetByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, repository.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
 			return
 		}
@@ -183,7 +189,13 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 	defer file.Close()
 
 	senha := r.FormValue("senha")
-	siglaUF := r.FormValue("sigla_uf")
+	siglaUF := strings.ToUpper(strings.TrimSpace(r.FormValue("sigla_uf")))
+	if siglaUF == "" {
+		siglaUF = strings.ToUpper(strings.TrimSpace(empresa.Estado))
+	}
+	if len(siglaUF) > 2 {
+		siglaUF = siglaUF[:2]
+	}
 	tpAmb := 1
 	if r.FormValue("tp_amb") == "2" {
 		tpAmb = 2
@@ -215,7 +227,7 @@ func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {
 
 	empresa, err := h.svc.GetByID(id)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
+		if errors.Is(err, repository.ErrNotFound) {
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
 			return
 		}

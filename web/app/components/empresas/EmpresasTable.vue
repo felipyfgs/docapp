@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
-import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
@@ -27,7 +26,7 @@ const UDropdownMenu = resolveComponent('UDropdownMenu')
 const table = useTemplateRef<{ tableApi: any }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
-const columnVisibility = ref<Record<string, boolean>>({})
+const columnVisibility = ref<Record<string, boolean>>({ nome_fantasia: false })
 const rowSelection = ref<Record<string, boolean>>({})
 
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
@@ -133,22 +132,8 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     accessorKey: 'cnpj',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'CNPJ',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
-    cell: ({ row }) => formatCNPJ(row.original.cnpj)
+    header: 'CNPJ',
+    cell: ({ row }) => h('span', { class: 'font-mono text-sm whitespace-nowrap' }, formatCNPJ(row.original.cnpj))
   },
   {
     accessorKey: 'razao_social',
@@ -206,8 +191,12 @@ const columns: TableColumn<Empresa>[] = [
     },
     cell: ({ row }) => {
       const s = row.original.situacao_cadastral
-      const color = s === 'Ativa' ? 'success' as const : 'warning' as const
-      return h(UBadge, { variant: 'subtle', color, class: 'capitalize' }, () => s || '—')
+      const isAtiva = s === 'Ativa'
+      return h(UBadge, {
+        variant: 'subtle',
+        color: isAtiva ? 'success' as const : 'warning' as const,
+        leadingIcon: isAtiva ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
+      }, () => s || '—')
     }
   },
   {
@@ -231,7 +220,11 @@ const columns: TableColumn<Empresa>[] = [
     cell: ({ row }) => {
       const { cidade, estado } = row.original
       if (!cidade && !estado) return '—'
-      return `${cidade || ''}${cidade && estado ? '/' : ''}${estado || ''}`
+      const texto = `${cidade || ''}${cidade && estado ? '/' : ''}${estado || ''}`
+      return h('div', { class: 'flex items-center gap-1' }, [
+        h('span', { class: 'i-lucide-map-pin size-3 text-muted shrink-0' }),
+        h('span', texto)
+      ])
     }
   },
   {
@@ -241,7 +234,7 @@ const columns: TableColumn<Empresa>[] = [
       return h(UButton, {
         color: 'neutral',
         variant: 'ghost',
-        label: 'Lookback',
+        label: 'Período',
         icon: isSorted
           ? isSorted === 'asc'
             ? 'i-lucide-arrow-up-narrow-wide'
@@ -251,7 +244,12 @@ const columns: TableColumn<Empresa>[] = [
         onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
       })
     },
-    cell: ({ row }) => `${row.original.lookback_days}d`
+    cell: ({ row }) => {
+      return h('div', { class: 'flex items-center gap-1' }, [
+        h('span', { class: 'i-lucide-calendar size-3 text-muted shrink-0' }),
+        h('span', `${row.original.lookback_days} dias`)
+      ])
+    }
   },
   {
     id: 'certificado',
@@ -273,7 +271,8 @@ const columns: TableColumn<Empresa>[] = [
     },
     cell: ({ row }) => {
       const status = row.original.certificado_status
-      const colorMap: Record<string, 'error' | 'warning' | 'success' | 'neutral'> = {
+      type CertColor = 'error' | 'warning' | 'success' | 'neutral'
+      const colorMap: Record<string, CertColor> = {
         vencido: 'error',
         prestes_a_vencer: 'warning',
         valido: 'success',
@@ -285,9 +284,18 @@ const columns: TableColumn<Empresa>[] = [
         valido: 'Válido',
         sem_certificado: 'Sem certificado'
       }
-      const color = colorMap[status || 'sem_certificado'] || 'neutral'
-      const label = labelMap[status || 'sem_certificado'] || 'Sem certificado'
-      return h(UBadge, { variant: 'subtle', color }, () => label)
+      const iconMap: Record<string, string> = {
+        vencido: 'i-lucide-shield-x',
+        prestes_a_vencer: 'i-lucide-shield-alert',
+        valido: 'i-lucide-shield-check',
+        sem_certificado: 'i-lucide-shield-off'
+      }
+      const key = status || 'sem_certificado'
+      return h(UBadge, {
+        variant: 'subtle',
+        color: colorMap[key] || 'neutral',
+        leadingIcon: iconMap[key]
+      }, () => labelMap[key] || 'Sem certificado')
     }
   },
   {
@@ -307,6 +315,16 @@ const columns: TableColumn<Empresa>[] = [
   }
 ]
 
+const columnLabels: Record<string, string> = {
+  cnpj: 'CNPJ',
+  razao_social: 'Razão Social',
+  nome_fantasia: 'Nome Fantasia',
+  situacao_cadastral: 'Situação',
+  localidade: 'Cidade/UF',
+  lookback_days: 'Período',
+  certificado: 'Certificado'
+}
+
 function getVisibilityItems() {
   if (!table.value?.tableApi) return []
   return table.value.tableApi
@@ -315,7 +333,7 @@ function getVisibilityItems() {
     .filter((column: any) => column.getCanHide())
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((column: any) => ({
-      label: upperFirst(column.id),
+      label: columnLabels[column.id] ?? column.id,
       type: 'checkbox' as const,
       checked: column.getIsVisible(),
       onUpdateChecked(checked: boolean) {

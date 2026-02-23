@@ -86,3 +86,53 @@ export interface Empresa {
   certificado_status?: 'vencido' | 'prestes_a_vencer' | 'valido' | 'sem_certificado'
   created_at: string
 }
+
+export type DocumentoTipo = 'nf-e' | 'nfc-e' | 'ct-e' | 'nfs-e' | 'desconhecido'
+export type DocumentoStatus = 'autorizada' | 'cancelada' | 'denegada' | 'desconhecido'
+
+export interface DocumentoFiscal {
+  id: number
+  empresa_id: number
+  empresa?: Empresa
+  nsu: string
+  chave_acesso: string
+  tipo_documento: DocumentoTipo
+  status_documento: DocumentoStatus
+  numero_documento: string
+  emitente_nome: string
+  emitente_cnpj: string
+  destinatario_nome: string
+  destinatario_cnpj: string
+  competencia: string
+  schema: string
+  xml_object_key?: string
+  xml_resumo: boolean
+  danfe_object_key?: string
+  danfe_generated_at?: string
+  data_emissao?: string
+  created_at: string
+}
+
+export interface DocumentoListResponse {
+  items: DocumentoFiscal[]
+  total: number
+  page: number
+  page_size: number
+}
+
+export interface DocumentoExportResponse {
+  file_name: string
+  mode: 'proxy' | 'presigned'
+  presigned_url?: string
+  total: number
+  xml_count: number
+  danfe_count: number
+  skipped_danfe: number
+}
+
+export interface DocumentoXMLResponse {
+  id: number
+  xml: string
+  xml_resumo: boolean
+  chave_acesso: string
+}

@@ -55,6 +55,17 @@ type ConsultaChaveRequest struct {
 	Chave          string `json:"chave"`
 }
 
+type DanfeRequest struct {
+	Tipo string `json:"tipo"`
+	XML  string `json:"xml"`
+}
+
+type DanfeResponse struct {
+	PDFBase64 string `json:"pdf_base64"`
+	MimeType  string `json:"mime_type"`
+	Error     string `json:"error,omitempty"`
+}
+
 type SefazResponse struct {
 	RawXML     string `json:"raw_xml"`
 	CStat      string `json:"cstat,omitempty"`
@@ -168,6 +179,47 @@ func (c *Client) ConsultaChave(ctx context.Context, pfx []byte, senha, cnpj, raz
 	}
 
 	return &resp, nil
+}
+
+func (c *Client) GenerateDanfe(ctx context.Context, tipo, xmlContent string) ([]byte, string, error) {
+	req := DanfeRequest{
+		Tipo: tipo,
+		XML:  xmlContent,
+	}
+
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, "", fmt.Errorf("marshaling danfe request: %w", err)
+	}
+
+	status, body, err := c.post(ctx, "/v1/sefaz/danfe", payload)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var resp DanfeResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, "", fmt.Errorf("parsing danfe response: %w", err)
+	}
+
+	if status >= 400 {
+		if resp.Error != "" {
+			return nil, "", fmt.Errorf("danfe error: %s", resp.Error)
+		}
+		return nil, "", fmt.Errorf("danfe error: status %d", status)
+	}
+
+	decoded, err := base64.StdEncoding.DecodeString(resp.PDFBase64)
+	if err != nil {
+		return nil, "", fmt.Errorf("decode danfe pdf: %w", err)
+	}
+
+	mimeType := resp.MimeType
+	if mimeType == "" {
+		mimeType = "application/pdf"
+	}
+
+	return decoded, mimeType, nil
 }
 
 func (c *Client) get(ctx context.Context, path string) (int, []byte, error) {

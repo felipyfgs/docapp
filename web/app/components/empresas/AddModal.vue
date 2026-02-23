@@ -7,7 +7,7 @@ const props = defineProps<{
   empresa?: Empresa | null
 }>()
 
-const emit = defineEmits<{ created: []; updated: []; close: [] }>()
+const emit = defineEmits<{ created: [], updated: [], close: [] }>()
 
 const open = ref(false)
 const toast = useToast()
@@ -68,7 +68,7 @@ const schema = z.object({
   bairro: z.string().optional(),
   cep: z.string().optional(),
   cidade: z.string().optional(),
-  estado: z.string().optional(),
+  estado: z.string().regex(/^[A-Z]{2}$/, 'UF deve conter 2 letras'),
   telefone: z.string().optional(),
   email: z.email('Email inválido').optional().or(z.literal('')),
   cnae: z.string().optional(),
@@ -79,6 +79,29 @@ const schema = z.object({
 })
 
 type Schema = z.output<typeof schema>
+
+type CnpjLookupResponse = {
+  razao_social?: string
+  porte?: { descricao?: string }
+  natureza_juridica?: { descricao?: string }
+  estabelecimento?: {
+    nome_fantasia?: string
+    situacao_cadastral?: string
+    tipo_logradouro?: string
+    logradouro?: string
+    numero?: string
+    complemento?: string
+    bairro?: string
+    cep?: string
+    cidade?: { nome?: string }
+    estado?: { sigla?: string }
+    ddd1?: string
+    telefone1?: string
+    email?: string
+    atividade_principal?: { id?: string }
+    data_inicio_atividade?: string
+  }
+}
 
 const state = reactive<Partial<Schema>>({
   cnpj: '',
@@ -116,6 +139,13 @@ const cnpjFormatted = computed({
   }
 })
 
+const estadoFormatted = computed({
+  get: () => (state.estado || '').toUpperCase(),
+  set: (val: string) => {
+    state.estado = val.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase()
+  }
+})
+
 async function buscarCNPJ() {
   const cnpj = state.cnpj
   if (!cnpj || cnpj.length !== 14) {
@@ -125,7 +155,7 @@ async function buscarCNPJ() {
 
   loadingCNPJ.value = true
   try {
-    const data: any = await $fetch(`/api/cnpj/${cnpj}`)
+    const data = await $fetch<CnpjLookupResponse>(`/api/cnpj/${cnpj}`)
     const est = data.estabelecimento ?? {}
     state.razao_social = data.razao_social ?? ''
     state.nome_fantasia = est.nome_fantasia ?? ''
@@ -171,6 +201,10 @@ async function onSubmit(event: FormSubmitEvent<Schema>) {
       const fd = new FormData()
       fd.append('certificado', certFile.value)
       fd.append('senha', certSenha.value)
+      const siglaUF = String(state.estado || '').trim().toUpperCase()
+      if (siglaUF) {
+        fd.append('sigla_uf', siglaUF)
+      }
       await $fetch(`/api/empresas/${empresaId}/certificado`, { method: 'POST', body: fd })
     }
 
@@ -205,7 +239,13 @@ function resetForm() {
     <UButton v-if="!isEditMode" label="Nova Empresa" icon="i-lucide-plus" />
 
     <template #body>
-      <UForm id="empresa-form" :schema="schema" :state="state" class="space-y-4" @submit="onSubmit">
+      <UForm
+        id="empresa-form"
+        :schema="schema"
+        :state="state"
+        class="space-y-4"
+        @submit="onSubmit"
+      >
         <!-- CNPJ com auto-fill -->
         <UFormField label="CNPJ" name="cnpj" required>
           <div class="flex items-center gap-2 w-full">
@@ -234,15 +274,20 @@ function resetForm() {
           variant="link"
           :items="[
             { label: 'Identificação', icon: 'i-lucide-building-2', slot: 'identificacao' },
-            { label: 'Endereço',      icon: 'i-lucide-map-pin',    slot: 'endereco' },
-            { label: 'Contato',       icon: 'i-lucide-phone',      slot: 'contato' },
-            { label: 'Fiscal',        icon: 'i-lucide-file-text',  slot: 'fiscal' },
-            { label: 'Configuração',  icon: 'i-lucide-settings-2', slot: 'configuracao' }
+            { label: 'Endereço', icon: 'i-lucide-map-pin', slot: 'endereco' },
+            { label: 'Contato', icon: 'i-lucide-phone', slot: 'contato' },
+            { label: 'Fiscal', icon: 'i-lucide-file-text', slot: 'fiscal' },
+            { label: 'Configuração', icon: 'i-lucide-settings-2', slot: 'configuracao' }
           ]"
         >
           <template #identificacao>
             <div class="grid grid-cols-2 gap-4 pt-4">
-              <UFormField label="Razão Social" name="razao_social" required class="col-span-2">
+              <UFormField
+                label="Razão Social"
+                name="razao_social"
+                required
+                class="col-span-2"
+              >
                 <UInput v-model="state.razao_social" class="w-full" />
               </UFormField>
               <UFormField label="Nome Fantasia" name="nome_fantasia" class="col-span-2">
@@ -277,8 +322,8 @@ function resetForm() {
               <UFormField label="Cidade" name="cidade">
                 <UInput v-model="state.cidade" class="w-full" />
               </UFormField>
-              <UFormField label="UF" name="estado">
-                <UInput v-model="state.estado" maxlength="2" class="w-full" />
+              <UFormField label="UF" name="estado" required>
+                <UInput v-model="estadoFormatted" maxlength="2" class="w-full" />
               </UFormField>
             </div>
           </template>
@@ -339,7 +384,7 @@ function resetForm() {
                       accept=".pfx,.p12"
                       class="sr-only"
                       @change="onCertFileChange"
-                    />
+                    >
                   </label>
                   <UButton
                     v-if="certFile"
@@ -361,14 +406,23 @@ function resetForm() {
             </div>
           </template>
         </UTabs>
-
       </UForm>
     </template>
 
     <template #footer>
       <div class="flex justify-end gap-2 w-full">
-        <UButton label="Cancelar" color="neutral" variant="subtle" @click="open = false; resetForm()" />
-        <UButton form="empresa-form" :label="submitLabel" color="primary" type="submit" />
+        <UButton
+          label="Cancelar"
+          color="neutral"
+          variant="subtle"
+          @click="open = false; resetForm()"
+        />
+        <UButton
+          form="empresa-form"
+          :label="submitLabel"
+          color="primary"
+          type="submit"
+        />
       </div>
     </template>
   </UModal>

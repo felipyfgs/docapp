@@ -1,4 +1,6 @@
 // https://nuxt.com/docs/api/configuration/nuxt-config
+const runtimeEnv = globalThis as { process?: { env?: Record<string, string | undefined> } }
+
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -13,7 +15,7 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
-    coreApiUrl: process.env.CORE_API_URL || 'http://localhost:8080'
+    coreApiUrl: runtimeEnv.process?.env?.CORE_API_URL || 'http://localhost:8080'
   },
 
   routeRules: {
@@ -21,6 +23,8 @@ export default defineNuxtConfig({
       cors: true
     }
   },
+
+  compatibilityDate: '2024-07-11',
 
   vite: {
     optimizeDeps: {
@@ -33,8 +37,6 @@ export default defineNuxtConfig({
       ]
     }
   },
-
-  compatibilityDate: '2024-07-11',
 
   eslint: {
     config: {

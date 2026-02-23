@@ -1,37 +1,56 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"docapp/core/internal/client"
 	"docapp/core/internal/config"
 	"docapp/core/internal/handler"
+	"docapp/core/internal/repository"
 	"docapp/core/internal/service"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/rs/zerolog"
-	"gorm.io/gorm"
+	"github.com/uptrace/bun"
 )
 
 type Server struct {
 	router http.Handler
 }
 
-func New(cfg *config.Config, db *gorm.DB, log zerolog.Logger) *Server {
+func New(cfg *config.Config, db *bun.DB, log zerolog.Logger) *Server {
 	c := client.New(cfg.SpedServiceURL, cfg.SpedTimeoutSeconds)
 
-	empresaService := service.NewEmpresaService(db)
-	syncService := service.NewSyncService(db, c, log)
+	var storage service.DocumentStorage
+	minioStorage, err := service.NewMinioStorage(cfg)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize minio storage")
+	} else {
+		if err := minioStorage.EnsureBucket(context.Background()); err != nil {
+			log.Error().Err(err).Msg("failed to ensure storage bucket")
+		} else {
+			storage = minioStorage
+		}
+	}
+
+	empresaRepo := repository.NewEmpresaRepository(db)
+	documentoRepo := repository.NewDocumentoRepository(db)
+
+	empresaService := service.NewEmpresaService(empresaRepo)
+	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
+	documentoService := service.NewDocumentoService(documentoRepo, storage, c, log)
 	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, log)
+	documentoHandler := handler.NewDocumentoHandler(documentoService, log)
 	cnpjHandler := handler.NewCNPJHandler(log)
 
 	r := chi.NewRouter()
 	r.Use(requestLogger(log))
 	r.Use(middleware.Recoverer)
 
-	RegisterRoutes(r, c, empresaHandler, cnpjHandler)
+	RegisterRoutes(r, c, empresaHandler, cnpjHandler, documentoHandler)
 
 	return &Server{router: r}
 }

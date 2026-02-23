@@ -11,7 +11,7 @@ class CertificateStore
     {
         $path = rtrim((string) config('sped.certs_path'), '/')."/{$tenant}.pfx";
 
-        if (!is_file($path)) {
+        if (! is_file($path)) {
             throw new TenantCredentialException("Certificado PFX do tenant '{$tenant}' não encontrado.");
         }
 

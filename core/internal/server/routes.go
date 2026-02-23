@@ -14,7 +14,7 @@ type proxyHandler struct {
 	client *client.Client
 }
 
-func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHandler, cnpj *handler.CNPJHandler) {
+func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHandler, cnpj *handler.CNPJHandler, documento *handler.DocumentoHandler) {
 	h := &proxyHandler{client: c}
 
 	r.Route("/fiscal", func(r chi.Router) {
@@ -29,6 +29,13 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 		r.Delete("/{id}", empresa.Delete)
 		r.Post("/{id}/certificado", empresa.UploadCertificado)
 		r.Post("/{id}/sync", empresa.Sync)
+	})
+
+	r.Route("/documentos", func(r chi.Router) {
+		r.Get("/", documento.List)
+		r.Get("/{id}/xml", documento.XML)
+		r.Post("/export", documento.Export)
+		r.Post("/backfill", documento.Backfill)
 	})
 
 	r.Get("/cnpj/{cnpj}", cnpj.Lookup)

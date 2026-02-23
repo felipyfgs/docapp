@@ -18,8 +18,7 @@ class NfeController extends Controller
         private readonly DistDFeService $distDFeService,
         private readonly DownloadByKeyService $downloadByKeyService,
         private readonly ConsultaChaveService $consultaChaveService
-    ) {
-    }
+    ) {}
 
     public function distDFe(Request $request): JsonResponse
     {

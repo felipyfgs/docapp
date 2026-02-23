@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"syscall"
@@ -8,6 +9,8 @@ import (
 
 	"docapp/core/internal/client"
 	"docapp/core/internal/config"
+	"docapp/core/internal/db"
+	"docapp/core/internal/repository"
 	"docapp/core/internal/service"
 
 	"github.com/rs/zerolog"
@@ -17,14 +20,29 @@ func main() {
 	cfg := config.Load()
 	log := config.NewLogger(cfg.Env)
 
-	db, err := config.ConnectDB(cfg.DatabaseURL, log)
+	bunDB, err := db.Connect(cfg.DatabaseURL, log)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to connect to database")
 	}
 
 	c := client.New(cfg.SpedServiceURL, cfg.SpedTimeoutSeconds)
-	empresaService := service.NewEmpresaService(db)
-	syncService := service.NewSyncService(db, c, log)
+
+	var storage service.DocumentStorage
+	minioStorage, err := service.NewMinioStorage(cfg)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to initialize minio storage")
+	} else {
+		if err := minioStorage.EnsureBucket(context.Background()); err != nil {
+			log.Error().Err(err).Msg("failed to ensure storage bucket")
+		} else {
+			storage = minioStorage
+		}
+	}
+
+	empresaRepo := repository.NewEmpresaRepository(bunDB)
+	documentoRepo := repository.NewDocumentoRepository(bunDB)
+	empresaService := service.NewEmpresaService(empresaRepo)
+	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
 
 	interval := time.Duration(cfg.WorkerIntervalMinutes) * time.Minute
 	log.Info().Dur("interval", interval).Str("sped_url", cfg.SpedServiceURL).Msg("worker starting")
@@ -82,4 +100,3 @@ func run(log zerolog.Logger, empresaService *service.EmpresaService, syncService
 		Dur("duration", time.Since(start)).
 		Msg("worker: sync cycle completed")
 }
-

@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -23,23 +24,31 @@ type DistDFeResponse struct {
 }
 
 type Document struct {
-	NSU          string     `json:"nsu"`
-	Schema       string     `json:"schema"`
-	DocumentType string     `json:"document_type"`
-	XML          string     `json:"xml"`
-	ChaveAcesso  string     `json:"chave_acesso"`
-	DataEmissao  *time.Time `json:"data_emissao,omitempty"`
+	NSU              string     `json:"nsu"`
+	Schema           string     `json:"schema"`
+	DocumentType     string     `json:"document_type"`
+	StatusDocumento  string     `json:"status_documento"`
+	NumeroDocumento  string     `json:"numero_documento"`
+	EmitenteNome     string     `json:"emitente_nome"`
+	EmitenteCNPJ     string     `json:"emitente_cnpj"`
+	DestinatarioNome string     `json:"destinatario_nome"`
+	DestinatarioCNPJ string     `json:"destinatario_cnpj"`
+	Competencia      string     `json:"competencia"`
+	XMLResumo        bool       `json:"xml_resumo"`
+	XML              string     `json:"xml"`
+	ChaveAcesso      string     `json:"chave_acesso"`
+	DataEmissao      *time.Time `json:"data_emissao,omitempty"`
 }
 
 type retDistDFeInt struct {
-	XMLName       xml.Name `xml:"retDistDFeInt"`
-	CStat         string   `xml:"cStat"`
-	XMotivo       string   `xml:"xMotivo"`
-	TpAmb         string   `xml:"tpAmb"`
-	VerAplic      string   `xml:"verAplic"`
-	DHResp        string   `xml:"dhResp"`
-	UltNSU        string   `xml:"ultNSU"`
-	MaxNSU        string   `xml:"maxNSU"`
+	XMLName        xml.Name        `xml:"retDistDFeInt"`
+	CStat          string          `xml:"cStat"`
+	XMotivo        string          `xml:"xMotivo"`
+	TpAmb          string          `xml:"tpAmb"`
+	VerAplic       string          `xml:"verAplic"`
+	DHResp         string          `xml:"dhResp"`
+	UltNSU         string          `xml:"ultNSU"`
+	MaxNSU         string          `xml:"maxNSU"`
 	LoteDistDFeInt *loteDistDFeInt `xml:"loteDistDFeInt"`
 }
 
@@ -54,8 +63,8 @@ type docZip struct {
 }
 
 func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
-	var ret retDistDFeInt
-	if err := xml.Unmarshal([]byte(rawXML), &ret); err != nil {
+	ret, err := extractRetDistDFeInt(rawXML)
+	if err != nil {
 		return nil, fmt.Errorf("parsing retDistDFeInt: %w", err)
 	}
 
@@ -76,13 +85,24 @@ func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
 				continue
 			}
 
+			dataEmissao := extractDataEmissao(docXML)
+			docType := documentTypeFromSchemaAndXML(dz.Schema, docXML)
+
 			doc := Document{
-				NSU:          dz.NSU,
-				Schema:       dz.Schema,
-				DocumentType: documentTypeFromSchema(dz.Schema),
-				XML:          docXML,
-				ChaveAcesso:  extractChaveAcesso(docXML),
-				DataEmissao:  extractDataEmissao(docXML),
+				NSU:              dz.NSU,
+				Schema:           dz.Schema,
+				DocumentType:     docType,
+				StatusDocumento:  extractStatusDocumento(docXML),
+				NumeroDocumento:  extractNumeroDocumento(docXML),
+				EmitenteNome:     extractEmitenteNome(docXML),
+				EmitenteCNPJ:     extractEmitenteCNPJ(docXML),
+				DestinatarioNome: extractDestinatarioNome(docXML),
+				DestinatarioCNPJ: extractDestinatarioCNPJ(docXML),
+				Competencia:      extractCompetencia(dataEmissao),
+				XMLResumo:        isResumoDocument(dz.Schema),
+				XML:              docXML,
+				ChaveAcesso:      extractChaveAcesso(docXML),
+				DataEmissao:      dataEmissao,
 			}
 
 			resp.Documents = append(resp.Documents, doc)
@@ -90,6 +110,44 @@ func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
 	}
 
 	return resp, nil
+}
+
+func extractRetDistDFeInt(rawXML string) (*retDistDFeInt, error) {
+	var direct retDistDFeInt
+	if err := xml.Unmarshal([]byte(rawXML), &direct); err == nil {
+		if direct.XMLName.Local == "retDistDFeInt" {
+			return &direct, nil
+		}
+	}
+
+	decoder := xml.NewDecoder(strings.NewReader(rawXML))
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		start, ok := token.(xml.StartElement)
+		if !ok {
+			continue
+		}
+
+		if start.Name.Local != "retDistDFeInt" {
+			continue
+		}
+
+		var nested retDistDFeInt
+		if err := decoder.DecodeElement(&nested, &start); err != nil {
+			return nil, err
+		}
+
+		return &nested, nil
+	}
+
+	return nil, fmt.Errorf("retDistDFeInt not found")
 }
 
 func decodeDocZip(encoded string) (string, error) {
@@ -116,19 +174,42 @@ func decodeDocZip(encoded string) (string, error) {
 
 	return string(content), nil
 }
+func documentTypeFromSchemaAndXML(schema, xmlContent string) string {
+	schemaLower := strings.ToLower(schema)
+	if strings.Contains(schemaLower, "nfse") {
+		return "nfs-e"
+	}
+	if strings.Contains(schemaLower, "cte") {
+		return "ct-e"
+	}
+	if strings.Contains(schemaLower, "nfe") {
+		if extractTagValue(xmlContent, "mod") == "65" {
+			return "nfc-e"
+		}
+		return "nf-e"
+	}
 
-func documentTypeFromSchema(schema string) string {
-	if schema == "" {
-		return "unknown"
+	mod := extractTagValue(xmlContent, "mod")
+	switch mod {
+	case "57":
+		return "ct-e"
+	case "65":
+		return "nfc-e"
+	case "55":
+		return "nf-e"
 	}
-	parts := strings.Split(strings.ToLower(schema), "_")
-	if len(parts) > 0 {
-		return parts[0]
-	}
-	return "unknown"
+
+	return "desconhecido"
 }
 
 func extractChaveAcesso(xmlContent string) string {
+	if id := extractAttributeValue(xmlContent, "Id"); id != "" {
+		re := regexp.MustCompile(`(\d{44})`)
+		if match := re.FindStringSubmatch(id); len(match) == 2 {
+			return match[1]
+		}
+	}
+
 	for _, tag := range []string{"<chNFe>", "<chCTe>"} {
 		start := strings.Index(xmlContent, tag)
 		if start == -1 {
@@ -142,6 +223,197 @@ func extractChaveAcesso(xmlContent string) string {
 		}
 	}
 	return ""
+}
+
+func extractEmitenteNome(xmlContent string) string {
+	return extractPartyName(xmlContent, "emit")
+}
+
+func extractEmitenteCNPJ(xmlContent string) string {
+	return extractPartyCNPJ(xmlContent, "emit")
+}
+
+func extractDestinatarioNome(xmlContent string) string {
+	for _, section := range []string{"dest", "rem", "toma"} {
+		if value := extractPartyName(xmlContent, section); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func extractDestinatarioCNPJ(xmlContent string) string {
+	for _, section := range []string{"dest", "rem", "toma"} {
+		if value := extractPartyCNPJ(xmlContent, section); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func extractNumeroDocumento(xmlContent string) string {
+	return extractTagValue(xmlContent, "nNF", "nCT", "nNFS", "nDoc")
+}
+
+func extractStatusDocumento(xmlContent string) string {
+	sit := extractTagValue(xmlContent, "cSitNFe", "cSitCTe", "cSit")
+	switch sit {
+	case "1":
+		return "autorizada"
+	case "2":
+		return "cancelada"
+	case "3":
+		return "denegada"
+	}
+
+	statusValues := extractTagValues(xmlContent, "cStat")
+
+	for _, code := range statusValues {
+		if isCancelledStatusCode(code) {
+			return "cancelada"
+		}
+	}
+
+	for _, code := range statusValues {
+		if isAuthorizedStatusCode(code) {
+			return "autorizada"
+		}
+	}
+
+	for _, code := range statusValues {
+		if isDeniedStatusCode(code) {
+			return "denegada"
+		}
+	}
+
+	return "desconhecido"
+}
+
+func extractCompetencia(dataEmissao *time.Time) string {
+	if dataEmissao == nil {
+		return ""
+	}
+	return dataEmissao.Format("2006/01")
+}
+
+func isResumoDocument(schema string) bool {
+	s := strings.ToLower(strings.TrimSpace(schema))
+	if s == "" {
+		return false
+	}
+	if strings.Contains(s, "proc") {
+		return false
+	}
+	return strings.Contains(s, "res")
+}
+
+func extractPartyName(xmlContent, section string) string {
+	body := extractSectionBody(xmlContent, section)
+	if body == "" {
+		return ""
+	}
+
+	return extractTagValue(body, "xNome", "xNomeDest", "xRazao")
+}
+
+func extractPartyCNPJ(xmlContent, section string) string {
+	body := extractSectionBody(xmlContent, section)
+	if body == "" {
+		return ""
+	}
+
+	return digitsOnly(extractTagValue(body, "CNPJ", "CPF"))
+}
+
+func extractSectionBody(xmlContent, section string) string {
+	re := regexp.MustCompile(`(?is)<(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(section) + `\b[^>]*>(.*?)</(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(section) + `>`)
+	match := re.FindStringSubmatch(xmlContent)
+	if len(match) != 2 {
+		return ""
+	}
+
+	return match[1]
+}
+
+func extractTagValue(xmlContent string, tags ...string) string {
+	for _, tag := range tags {
+		re := regexp.MustCompile(`(?is)<(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(tag) + `\b[^>]*>\s*([^<]+?)\s*</(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(tag) + `>`)
+		match := re.FindStringSubmatch(xmlContent)
+		if len(match) == 2 {
+			return strings.TrimSpace(match[1])
+		}
+	}
+
+	return ""
+}
+
+func extractTagValues(xmlContent string, tag string) []string {
+	re := regexp.MustCompile(`(?is)<(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(tag) + `\b[^>]*>\s*([^<]+?)\s*</(?:[a-z0-9_]+:)?` + regexp.QuoteMeta(tag) + `>`)
+	matches := re.FindAllStringSubmatch(xmlContent, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	values := make([]string, 0, len(matches))
+	for _, match := range matches {
+		if len(match) == 2 {
+			values = append(values, strings.TrimSpace(match[1]))
+		}
+	}
+
+	return values
+}
+
+func extractAttributeValue(xmlContent, attr string) string {
+	re := regexp.MustCompile(`(?is)\b` + regexp.QuoteMeta(attr) + `\s*=\s*"([^"]+)"`)
+	match := re.FindStringSubmatch(xmlContent)
+	if len(match) == 2 {
+		return strings.TrimSpace(match[1])
+	}
+	return ""
+}
+
+func digitsOnly(value string) string {
+	if value == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+
+	return b.String()
+}
+
+func isAuthorizedStatusCode(code string) bool {
+	switch code {
+	case "100", "150":
+		return true
+	default:
+		return false
+	}
+}
+
+func isCancelledStatusCode(code string) bool {
+	switch code {
+	case "101", "135", "136", "151", "155":
+		return true
+	default:
+		return false
+	}
+}
+
+func isDeniedStatusCode(code string) bool {
+	switch code {
+	case "110", "301", "302":
+		return true
+	default:
+		return false
+	}
 }
 
 func extractDataEmissao(xmlContent string) *time.Time {
@@ -160,7 +432,7 @@ func extractDataEmissao(xmlContent string) *time.Time {
 
 		raw := strings.TrimSpace(xmlContent[start : start+end])
 
-		for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-07:00", "2006-01-02"} {
+		for _, layout := range []string{time.RFC3339, "2006-01-02T15:04:05-07:00", "2006-01-02", "2006-01-02T15:04:05"} {
 			if t, err := time.Parse(layout, raw); err == nil {
 				return &t
 			}
