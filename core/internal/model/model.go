@@ -135,9 +135,9 @@ type DocumentoFiscal struct {
 	StatusDocumento  string     `bun:"status_documento,notnull" json:"status_documento"`
 	NumeroDocumento  string     `bun:"numero_documento" json:"numero_documento"`
 	EmitenteNome     string     `json:"emitente_nome"`
-	EmitenteCNPJ     string     `bun:"emitente_cnpj" json:"emitente_cnpj"`
+	EmitenteCNPJ     string     `bun:"emitente_cnpj,nullzero" json:"emitente_cnpj"`
 	DestinatarioNome string     `json:"destinatario_nome"`
-	DestinatarioCNPJ string     `bun:"destinatario_cnpj" json:"destinatario_cnpj"`
+	DestinatarioCNPJ string     `bun:"destinatario_cnpj,nullzero" json:"destinatario_cnpj"`
 	Competencia      string     `json:"competencia"`
 	Schema           string     `bun:"schema_nome" json:"schema"`
 	XMLObjectKey     string     `bun:"xml_object_key,notnull" json:"xml_object_key"`

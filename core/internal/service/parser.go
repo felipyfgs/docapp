@@ -322,7 +322,11 @@ func extractPartyCNPJ(xmlContent, section string) string {
 		return ""
 	}
 
-	return digitsOnly(extractTagValue(body, "CNPJ", "CPF"))
+	v := digitsOnly(extractTagValue(body, "CNPJ"))
+	if len(v) == 14 {
+		return v
+	}
+	return ""
 }
 
 func extractSectionBody(xmlContent, section string) string {

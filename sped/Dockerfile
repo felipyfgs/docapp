@@ -1,4 +1,4 @@
-FROM php:8.3-cli-alpine
+FROM php:8.4-cli-alpine
 
 RUN apk add --no-cache \
     curl \
@@ -26,7 +26,9 @@ WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-dev \
+RUN mkdir -p bootstrap/cache storage/logs storage/framework/{sessions,views,cache} \
+    && chmod -R 775 bootstrap/cache storage \
+    && composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-dev \
     && cp .env.example .env \
     && php artisan key:generate --force
 
