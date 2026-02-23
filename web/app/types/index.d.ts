@@ -138,3 +138,34 @@ export interface DocumentoXMLResponse {
   xml_resumo: boolean
   chave_acesso: string
 }
+
+export interface EmpresaSyncState {
+  ult_nsu: string
+  max_nsu: string
+  ultima_sincronizacao?: string
+  blocked_until?: string
+  ultimo_cstat: string
+  ultimo_xmotivo: string
+  ativo: boolean
+  lookback_days: number
+}
+
+export interface EmpresaDocumentoStats {
+  total: number
+  xml_completo: number
+  xml_resumo: number
+  manifestados: number
+}
+
+export interface CompetenciaCount {
+  competencia: string
+  count: number
+}
+
+export interface EmpresaOverview {
+  empresa: Empresa
+  sync_state?: EmpresaSyncState
+  stats: EmpresaDocumentoStats
+  documentos_por_competencia: CompetenciaCount[]
+  documentos_recentes: DocumentoFiscal[]
+}

@@ -18,10 +18,12 @@ type SyncStatePatch struct {
 	UltNSU              *string
 	MaxNSU              *string
 	UltimaSincronizacao *time.Time
-	BlockedUntil        *time.Time
-	SetBlockedUntil     bool
-	UltimoCStat         *string
-	UltimoXMotivo       *string
+	BlockedUntil            *time.Time
+	SetBlockedUntil         bool
+	DownloadBlockedUntil    *time.Time
+	SetDownloadBlockedUntil bool
+	UltimoCStat             *string
+	UltimoXMotivo           *string
 }
 
 type EmpresaRepository struct {
@@ -251,6 +253,13 @@ func (r *EmpresaRepository) UpdateSyncState(ctx context.Context, empresaID uint,
 			query = query.Set("blocked_until = NULL")
 		} else {
 			query = query.Set("blocked_until = ?", *patch.BlockedUntil)
+		}
+	}
+	if patch.SetDownloadBlockedUntil {
+		if patch.DownloadBlockedUntil == nil {
+			query = query.Set("download_blocked_until = NULL")
+		} else {
+			query = query.Set("download_blocked_until = ?", *patch.DownloadBlockedUntil)
 		}
 	}
 	if patch.UltimoCStat != nil {

@@ -29,6 +29,7 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 		r.Delete("/{id}", empresa.Delete)
 		r.Post("/{id}/certificado", empresa.UploadCertificado)
 		r.Post("/{id}/sync", empresa.Sync)
+		r.Get("/{id}/overview", empresa.Overview)
 	})
 
 	r.Route("/documentos", func(r chi.Router) {

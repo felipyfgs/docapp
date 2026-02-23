@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TableColumn } from '@nuxt/ui'
+import type { TableColumn, TableRow } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
@@ -147,7 +147,7 @@ const columns: TableColumn<Empresa>[] = [
         onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
       })
     },
-    cell: ({ row }) => h('div', { class: 'min-w-56' }, [
+    cell: ({ row }) => h('div', { class: 'min-w-48 max-w-64' }, [
       h('p', { class: 'font-medium text-highlighted truncate' }, row.original.razao_social),
       h('p', { class: 'text-xs text-muted' }, formatCNPJ(row.original.cnpj))
     ])
@@ -381,8 +381,10 @@ function getVisibilityItems() {
       tbody: '[&>tr]:last:[&>td]:border-b-0',
       th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
       td: 'border-b border-default',
-      separator: 'h-0'
+      separator: 'h-0',
+      tr: 'cursor-pointer hover:bg-elevated/40 transition-colors'
     }"
+    @select="(_: Event, row: TableRow<Empresa>) => navigateTo(`/empresas/${row.original.id}`)"
   />
 
   <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">

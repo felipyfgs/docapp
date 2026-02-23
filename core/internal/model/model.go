@@ -119,6 +119,7 @@ type EmpresaSyncState struct {
 	MaxNSU              string     `bun:"max_nsu,nullzero" json:"max_nsu"`
 	UltimaSincronizacao *time.Time `bun:"ultima_sincronizacao,nullzero" json:"ultima_sincronizacao"`
 	BlockedUntil        *time.Time `bun:"blocked_until,nullzero" json:"blocked_until"`
+	DownloadBlockedUntil *time.Time `bun:"download_blocked_until,nullzero" json:"download_blocked_until"`
 	UltimoCStat         string     `bun:"ultimo_cstat" json:"ultimo_cstat"`
 	UltimoXMotivo       string     `bun:"ultimo_xmotivo" json:"ultimo_xmotivo"`
 }

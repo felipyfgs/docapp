@@ -42,7 +42,7 @@ func New(cfg *config.Config, db *bun.DB, log zerolog.Logger) *Server {
 	empresaService := service.NewEmpresaService(empresaRepo)
 	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
 	documentoService := service.NewDocumentoService(documentoRepo, storage, c, log)
-	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, log)
+	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, documentoRepo, log)
 	documentoHandler := handler.NewDocumentoHandler(documentoService, log)
 	cnpjHandler := handler.NewCNPJHandler(log)
 

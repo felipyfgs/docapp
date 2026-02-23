@@ -46,6 +46,14 @@ func NewSyncService(empresaRepo *repository.EmpresaRepository, documentoRepo *re
 }
 
 func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
+	return s.syncEmpresa(empresa, false)
+}
+
+func (s *SyncService) SyncEmpresaForce(empresa model.Empresa) error {
+	return s.syncEmpresa(empresa, true)
+}
+
+func (s *SyncService) syncEmpresa(empresa model.Empresa, force bool) error {
 	if s.storage == nil {
 		return fmt.Errorf("storage not configured")
 	}
@@ -53,25 +61,29 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 	ctx := context.Background()
 	siglaUF := normalizeSiglaUF(firstNonEmpty(empresa.SiglaUF, empresa.Estado))
 
-	if empresa.SyncState != nil && empresa.SyncState.BlockedUntil != nil {
-		if time.Now().Before(*empresa.SyncState.BlockedUntil) {
-			s.log.Debug().Str("cnpj", empresa.CNPJ).
-				Time("blocked_until", *empresa.SyncState.BlockedUntil).
-				Msg("skipping, still blocked by SEFAZ")
-			return nil
+	if !force {
+		if empresa.SyncState != nil && empresa.SyncState.BlockedUntil != nil {
+			if time.Now().Before(*empresa.SyncState.BlockedUntil) {
+				s.log.Debug().Str("cnpj", empresa.CNPJ).
+					Time("blocked_until", *empresa.SyncState.BlockedUntil).
+					Msg("skipping, still blocked by SEFAZ")
+				return nil
+			}
+		}
+
+		if empresa.UltimaSincronizacao != nil {
+			if time.Since(*empresa.UltimaSincronizacao) < minSyncInterval {
+				s.log.Debug().Str("cnpj", empresa.CNPJ).Msg("skipping, synced recently")
+				return nil
+			}
 		}
 	}
 
-	if empresa.UltimaSincronizacao != nil {
-		if time.Since(*empresa.UltimaSincronizacao) < minSyncInterval {
-			s.log.Debug().Str("cnpj", empresa.CNPJ).Msg("skipping, synced recently")
+	if !force {
+		if err := s.rateLimiter.Allow(empresa.CNPJ); err != nil {
+			s.log.Warn().Str("cnpj", empresa.CNPJ).Msg("rate limited, skipping sync")
 			return nil
 		}
-	}
-
-	if err := s.rateLimiter.Allow(empresa.CNPJ); err != nil {
-		s.log.Warn().Str("cnpj", empresa.CNPJ).Msg("rate limited, skipping sync")
-		return nil
 	}
 
 	if len(empresa.CertificadoPFX) == 0 || empresa.CertificadoSenha == "" {
@@ -299,15 +311,18 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 		Str("ult_nsu", currentNSU).
 		Msg("sync completed")
 
-	s.processarResumosPendentes(ctx, empresa, siglaUF)
+	s.enviarCienciasPendentes(ctx, empresa, siglaUF)
+	s.baixarDocsBloqueados(ctx, empresa, siglaUF, force)
 
 	return nil
 }
 
-func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa model.Empresa, siglaUF string) {
-	pendentes, err := s.documentoRepo.ListPendingManifestacao(ctx, empresa.ID)
+// enviarCienciasPendentes sends Ciência da Operação for all resNFe summaries with no manifestation yet.
+// The full procNFe XML will be returned by SEFAZ on the next distNSU call (no consChNFe needed).
+func (s *SyncService) enviarCienciasPendentes(ctx context.Context, empresa model.Empresa, siglaUF string) {
+	pendentes, err := s.documentoRepo.ListPendingCiencia(ctx, empresa.ID)
 	if err != nil {
-		s.log.Warn().Err(err).Uint("empresa_id", empresa.ID).Msg("failed to list pending manifestacao")
+		s.log.Warn().Err(err).Uint("empresa_id", empresa.ID).Msg("failed to list pending ciencia")
 		return
 	}
 
@@ -318,10 +333,9 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 	s.log.Info().
 		Uint("empresa_id", empresa.ID).
 		Int("pendentes", len(pendentes)).
-		Msg("processing pending resNFe manifestations")
+		Msg("sending ciencia for pending resNFe")
 
 	for _, doc := range pendentes {
-		// 1. Enviar Ciencia da Emissao (210210)
 		manifResp, err := s.client.Manifesta(
 			ctx,
 			empresa.CertificadoPFX,
@@ -335,9 +349,7 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			"",
 		)
 		if err != nil {
-			s.log.Warn().Err(err).
-				Str("chave", doc.ChaveAcesso).
-				Msg("ciencia failed, skipping download")
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("ciencia request failed")
 			continue
 		}
 
@@ -348,8 +360,8 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			Str("xmotivo", manifResp.XMotivo).
 			Msg("ciencia response")
 
-		// cStat 135 = evento registrado com sucesso, 573 = duplicidade (ja manifestado)
-		if manifCStat != "135" && manifCStat != "573" {
+		// 128 = lote processado (batch ok), 135 = evento registrado, 573 = duplicidade
+		if manifCStat != "128" && manifCStat != "135" && manifCStat != "573" {
 			s.log.Warn().
 				Str("chave", doc.ChaveAcesso).
 				Str("cstat", manifCStat).
@@ -358,12 +370,42 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			continue
 		}
 
-		now := time.Now()
-		_ = s.documentoRepo.UpdateManifestacaoStatus(ctx, doc.ID, "ciencia", now)
-
+		_ = s.documentoRepo.UpdateManifestacaoStatus(ctx, doc.ID, "ciencia", time.Now())
 		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
+	}
+}
 
-		// 2. Download XML completo via sefazDownload
+// baixarDocsBloqueados is a fallback for docs where ciência was sent but procNFe never arrived
+// via distNSU after 2+ hours. Uses consChNFe directly, limited to 20/hour — stops immediately on 656.
+func (s *SyncService) baixarDocsBloqueados(ctx context.Context, empresa model.Empresa, siglaUF string, force bool) {
+	if !force {
+		if empresa.SyncState != nil && empresa.SyncState.DownloadBlockedUntil != nil {
+			if time.Now().Before(*empresa.SyncState.DownloadBlockedUntil) {
+				s.log.Debug().
+					Str("cnpj", empresa.CNPJ).
+					Time("blocked_until", *empresa.SyncState.DownloadBlockedUntil).
+					Msg("consChNFe downloads blocked, skipping fallback")
+				return
+			}
+		}
+	}
+
+	docs, err := s.documentoRepo.ListDocsBloqueadosSemXML(ctx, empresa.ID)
+	if err != nil {
+		s.log.Warn().Err(err).Uint("empresa_id", empresa.ID).Msg("failed to list stuck docs for fallback download")
+		return
+	}
+
+	if len(docs) == 0 {
+		return
+	}
+
+	s.log.Info().
+		Uint("empresa_id", empresa.ID).
+		Int("docs", len(docs)).
+		Msg("fallback: downloading stuck resNFe via consChNFe")
+
+	for _, doc := range docs {
 		dlResp, err := s.client.DownloadByKey(
 			ctx,
 			empresa.CertificadoPFX,
@@ -375,34 +417,42 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			doc.ChaveAcesso,
 		)
 		if err != nil {
-			s.log.Warn().Err(err).
-				Str("chave", doc.ChaveAcesso).
-				Msg("download by key failed after ciencia")
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("fallback download request failed")
 			continue
 		}
 
 		dlCStat := firstNonEmpty(dlResp.CStat)
+
+		if dlCStat == "656" {
+			blockedUntil := time.Now().Add(time.Hour)
+			_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
+				DownloadBlockedUntil:    &blockedUntil,
+				SetDownloadBlockedUntil: true,
+			})
+			s.log.Warn().
+				Str("cnpj", empresa.CNPJ).
+				Time("blocked_until", blockedUntil).
+				Msg("consChNFe rate limit (656), stopping fallback downloads for 1h")
+			break
+		}
+
 		if dlCStat != "138" && dlCStat != "140" {
 			s.log.Warn().
 				Str("chave", doc.ChaveAcesso).
 				Str("cstat", dlCStat).
 				Str("xmotivo", dlResp.XMotivo).
-				Msg("download returned unexpected cstat")
+				Msg("fallback download unexpected cstat")
 			continue
 		}
 
-		// Parse o XML completo do download (vem dentro do retDistDFeInt)
 		dlParsed, err := ParseDistDFeResponse(dlResp.RawXML)
 		if err != nil || len(dlParsed.Documents) == 0 {
-			s.log.Warn().Err(err).
-				Str("chave", doc.ChaveAcesso).
-				Msg("failed to parse downloaded XML")
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("fallback: failed to parse downloaded XML")
 			continue
 		}
 
 		fullDoc := dlParsed.Documents[0]
 
-		// Salvar XML completo no minio (substitui o resumo)
 		xmlObjectKey := s.storage.BuildDocumentKey(
 			fullDoc.DocumentType,
 			fullDoc.Competencia,
@@ -410,14 +460,13 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			doc.ChaveAcesso+".xml",
 		)
 		if err := s.storage.PutObject(ctx, xmlObjectKey, "application/xml", []byte(fullDoc.XML)); err != nil {
-			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("failed to upload full xml")
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("fallback: failed to upload full xml")
 			continue
 		}
 
 		xmlHash := sha256.Sum256([]byte(fullDoc.XML))
-		searchText := buildDocumentSearchText(empresa.CNPJ, fullDoc)
+		now := time.Now()
 
-		// Atualizar doc no banco
 		if err := s.documentoRepo.UpgradeFromResumo(ctx, doc.ID, model.DocumentoFiscal{
 			XMLObjectKey:       xmlObjectKey,
 			XMLSHA256:          hex.EncodeToString(xmlHash[:]),
@@ -429,19 +478,25 @@ func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa mod
 			NumeroDocumento:    fullDoc.NumeroDocumento,
 			StatusDocumento:    fullDoc.StatusDocumento,
 			Schema:             fullDoc.Schema,
-			SearchText:         searchText,
+			SearchText:         buildDocumentSearchText(empresa.CNPJ, fullDoc),
 			ManifestacaoStatus: "ciencia",
 			ManifestacaoAt:     &now,
 		}); err != nil {
-			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("failed to upgrade doc from resumo")
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("fallback: failed to upgrade doc from resumo")
 			continue
 		}
+
+		// Clear download block on first successful download
+		_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
+			SetDownloadBlockedUntil: true,
+			DownloadBlockedUntil:    nil,
+		})
 
 		s.log.Info().
 			Str("chave", doc.ChaveAcesso).
 			Str("emitente", fullDoc.EmitenteNome).
 			Str("numero", fullDoc.NumeroDocumento).
-			Msg("upgraded resNFe to full XML")
+			Msg("fallback: upgraded resNFe to full XML via consChNFe")
 
 		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
 	}

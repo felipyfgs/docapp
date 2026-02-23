@@ -17,9 +17,10 @@ import (
 )
 
 type EmpresaHandler struct {
-	svc         *service.EmpresaService
-	syncService *service.SyncService
-	log         zerolog.Logger
+	svc           *service.EmpresaService
+	syncService   *service.SyncService
+	documentoRepo *repository.DocumentoRepository
+	log           zerolog.Logger
 }
 
 type EmpresaResponse struct {
@@ -42,8 +43,8 @@ func toEmpresaResponses(empresas []model.Empresa) []EmpresaResponse {
 	return result
 }
 
-func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, log zerolog.Logger) *EmpresaHandler {
-	return &EmpresaHandler{svc: svc, syncService: syncService, log: log}
+func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, documentoRepo *repository.DocumentoRepository, log zerolog.Logger) *EmpresaHandler {
+	return &EmpresaHandler{svc: svc, syncService: syncService, documentoRepo: documentoRepo, log: log}
 }
 
 func (h *EmpresaHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -251,7 +252,7 @@ func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.syncService.SyncEmpresa(*empresa); err != nil {
+	if err := h.syncService.SyncEmpresaForce(*empresa); err != nil {
 		h.log.Error().Err(err).Uint("id", id).Msg("sync failed")
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
 			"message": "Erro ao sincronizar empresa.",
@@ -261,6 +262,68 @@ func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{"message": "Sincronização concluída."})
+}
+
+func (h *EmpresaHandler) Overview(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "ID inválido."})
+		return
+	}
+
+	empresa, err := h.svc.GetByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
+			return
+		}
+		h.log.Error().Err(err).Uint("id", id).Msg("get empresa for overview failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao buscar empresa."})
+		return
+	}
+
+	ctx := r.Context()
+
+	stats, err := h.documentoRepo.StatsEmpresa(ctx, id)
+	if err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("stats empresa failed")
+		stats = &repository.DocumentoStats{}
+	}
+
+	porCompetencia, err := h.documentoRepo.GroupByCompetencia(ctx, id)
+	if err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("group by competencia failed")
+		porCompetencia = nil
+	}
+
+	recentes, err := h.documentoRepo.ListRecentes(ctx, id, 10)
+	if err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("list recentes failed")
+		recentes = nil
+	}
+
+	var syncState map[string]interface{}
+	if empresa.SyncState != nil {
+		s := empresa.SyncState
+		syncState = map[string]interface{}{
+			"ult_nsu":              s.UltNSU,
+			"max_nsu":              s.MaxNSU,
+			"ultima_sincronizacao": s.UltimaSincronizacao,
+			"blocked_until":        s.BlockedUntil,
+			"ultimo_cstat":         s.UltimoCStat,
+			"ultimo_xmotivo":       s.UltimoXMotivo,
+			"ativo":                s.Ativo,
+			"lookback_days":        s.LookbackDays,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"empresa":                  toEmpresaResponse(*empresa),
+		"sync_state":               syncState,
+		"stats":                    stats,
+		"documentos_por_competencia": porCompetencia,
+		"documentos_recentes":      recentes,
+	})
 }
 
 func parseID(r *http.Request) (uint, error) {
