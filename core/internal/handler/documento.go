@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -15,8 +16,9 @@ import (
 )
 
 type DocumentoHandler struct {
-	svc *service.DocumentoService
-	log zerolog.Logger
+	svc           *service.DocumentoService
+	importService *service.ImportService
+	log           zerolog.Logger
 }
 
 type exportRequest struct {
@@ -30,8 +32,8 @@ type backfillRequest struct {
 	Limit int `json:"limit"`
 }
 
-func NewDocumentoHandler(svc *service.DocumentoService, log zerolog.Logger) *DocumentoHandler {
-	return &DocumentoHandler{svc: svc, log: log}
+func NewDocumentoHandler(svc *service.DocumentoService, importService *service.ImportService, log zerolog.Logger) *DocumentoHandler {
+	return &DocumentoHandler{svc: svc, importService: importService, log: log}
 }
 
 func (h *DocumentoHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -179,4 +181,54 @@ func parseQueryInt(r *http.Request, key string, fallback int) int {
 	}
 
 	return value
+}
+
+func (h *DocumentoHandler) Import(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(200 << 20); err != nil {
+		writeJSONDoc(w, http.StatusBadRequest, map[string]string{"message": "Falha ao ler form-data."})
+		return
+	}
+
+	fhs := r.MultipartForm.File["files"]
+	if len(fhs) == 0 {
+		writeJSONDoc(w, http.StatusBadRequest, map[string]string{"message": "Campo 'files' não encontrado."})
+		return
+	}
+
+	var allFiles []service.ImportFile
+	for _, fh := range fhs {
+		ext := strings.ToLower(filepath.Ext(fh.Filename))
+		if ext != ".xml" && ext != ".zip" {
+			continue
+		}
+		f, err := fh.Open()
+		if err != nil {
+			continue
+		}
+		content, err := io.ReadAll(f)
+		f.Close()
+		if err != nil {
+			continue
+		}
+		extracted, err := service.ExtractFiles(fh.Filename, content)
+		if err != nil {
+			h.log.Warn().Err(err).Str("filename", fh.Filename).Msg("import: extract failed")
+			continue
+		}
+		allFiles = append(allFiles, extracted...)
+	}
+
+	if len(allFiles) == 0 {
+		writeJSONDoc(w, http.StatusBadRequest, map[string]string{"message": "Nenhum arquivo XML encontrado."})
+		return
+	}
+
+	result := h.importService.ImportDocumentosAuto(r.Context(), allFiles)
+	writeJSONDoc(w, http.StatusOK, result)
+}
+
+func writeJSONDoc(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
 }

@@ -41,9 +41,10 @@ func New(cfg *config.Config, db *bun.DB, log zerolog.Logger) *Server {
 
 	empresaService := service.NewEmpresaService(empresaRepo)
 	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
+	importService := service.NewImportService(documentoRepo, empresaRepo, storage, log)
 	documentoService := service.NewDocumentoService(documentoRepo, storage, c, log)
-	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, documentoRepo, log)
-	documentoHandler := handler.NewDocumentoHandler(documentoService, log)
+	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, importService, documentoRepo, log)
+	documentoHandler := handler.NewDocumentoHandler(documentoService, importService, log)
 	cnpjHandler := handler.NewCNPJHandler(log)
 
 	r := chi.NewRouter()

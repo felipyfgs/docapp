@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,7 @@ import (
 type EmpresaHandler struct {
 	svc           *service.EmpresaService
 	syncService   *service.SyncService
+	importService *service.ImportService
 	documentoRepo *repository.DocumentoRepository
 	log           zerolog.Logger
 }
@@ -43,8 +45,8 @@ func toEmpresaResponses(empresas []model.Empresa) []EmpresaResponse {
 	return result
 }
 
-func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, documentoRepo *repository.DocumentoRepository, log zerolog.Logger) *EmpresaHandler {
-	return &EmpresaHandler{svc: svc, syncService: syncService, documentoRepo: documentoRepo, log: log}
+func NewEmpresaHandler(svc *service.EmpresaService, syncService *service.SyncService, importService *service.ImportService, documentoRepo *repository.DocumentoRepository, log zerolog.Logger) *EmpresaHandler {
+	return &EmpresaHandler{svc: svc, syncService: syncService, importService: importService, documentoRepo: documentoRepo, log: log}
 }
 
 func (h *EmpresaHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -340,4 +342,61 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+func (h *EmpresaHandler) Import(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "ID inválido."})
+		return
+	}
+
+	empresa, err := h.svc.GetByID(id)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "Empresa não encontrada."})
+			return
+		}
+		h.log.Error().Err(err).Uint("id", id).Msg("get empresa for import failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao buscar empresa."})
+		return
+	}
+
+	if err := r.ParseMultipartForm(200 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Falha ao ler form-data."})
+		return
+	}
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Campo 'file' não encontrado."})
+		return
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao ler arquivo."})
+		return
+	}
+
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	if ext != ".xml" && ext != ".zip" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Tipo de arquivo não suportado. Use .xml ou .zip."})
+		return
+	}
+
+	files, err := service.ExtractFiles(header.Filename, content)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Falha ao extrair arquivos: " + err.Error()})
+		return
+	}
+
+	if len(files) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Nenhum arquivo XML encontrado."})
+		return
+	}
+
+	result := h.importService.ImportDocumentos(r.Context(), *empresa, files)
+	writeJSON(w, http.StatusOK, result)
 }

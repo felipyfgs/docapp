@@ -111,6 +111,22 @@ func (r *EmpresaRepository) GetByID(ctx context.Context, id uint) (*model.Empres
 	return &empresa, nil
 }
 
+func (r *EmpresaRepository) FindByCNPJ(ctx context.Context, cnpj string) (*model.Empresa, error) {
+	var empresa model.Empresa
+	err := r.baseSelect(ctx, &empresa).
+		Where("e.cnpj = ?", cnpj).
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	empresa.HydrateFromRelations()
+	return &empresa, nil
+}
+
 func (r *EmpresaRepository) Update(ctx context.Context, id uint, updates *model.Empresa) (*model.Empresa, error) {
 	err := r.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		current, err := r.getByIDTx(ctx, tx, id)

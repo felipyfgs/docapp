@@ -6,7 +6,9 @@ import (
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"hash/fnv"
 	"io"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -509,4 +511,73 @@ func ParseConsultaChaveResponse(rawXML string) (*ConsultaChaveResponse, error) {
 	}
 
 	return resp, nil
+}
+
+// ParseNFeProcXML parses a raw nfeProc/procNFe XML (without the retDistDFeInt wrapper)
+// and returns a Document. nsu can be extracted from the filename via NSUFromFilename.
+func ParseNFeProcXML(xmlContent string, nsu string) Document {
+	dataEmissao := extractDataEmissao(xmlContent)
+	schema := schemaFromRawXML(xmlContent)
+	return Document{
+		NSU:              nsu,
+		Schema:           schema,
+		DocumentType:     documentTypeFromSchemaAndXML(schema, xmlContent),
+		StatusDocumento:  extractStatusDocumento(xmlContent),
+		NumeroDocumento:  extractNumeroDocumento(xmlContent),
+		EmitenteNome:     extractEmitenteNome(xmlContent),
+		EmitenteCNPJ:     extractEmitenteCNPJ(xmlContent),
+		DestinatarioNome: extractDestinatarioNome(xmlContent),
+		DestinatarioCNPJ: extractDestinatarioCNPJ(xmlContent),
+		Competencia:      extractCompetencia(dataEmissao),
+		XMLResumo:        false,
+		XML:              xmlContent,
+		ChaveAcesso:      extractChaveAcesso(xmlContent),
+		DataEmissao:      dataEmissao,
+	}
+}
+
+// NSUFromFilename extracts the 15-digit NSU from filenames like WS_<NSU>_<chave>.xml.
+func NSUFromFilename(filename string) string {
+	base := strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
+	parts := strings.Split(base, "_")
+	if len(parts) >= 3 {
+		candidate := parts[1]
+		matched, _ := regexp.MatchString(`^\d{15}$`, candidate)
+		if matched {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// CNPJFromChave extracts the 14-digit emitente CNPJ from a 44-digit chave_acesso.
+// chave layout: cUF(2) + AAMM(4) + CNPJ(14) + mod(2) + serie(3) + nNF(9) + tpEmis(1) + cNF(8) + cDV(1)
+func CNPJFromChave(chave string) string {
+	chave = strings.TrimSpace(chave)
+	if len(chave) != 44 {
+		return ""
+	}
+	return chave[6:20]
+}
+
+// nsuFromChave derives a deterministic 15-digit NSU from a chave_acesso.
+func nsuFromChave(chave string) string {
+	h := fnv.New64a()
+	h.Write([]byte(chave))
+	return fmt.Sprintf("%015d", h.Sum64()%1_000_000_000_000_000)
+}
+
+// schemaFromRawXML detects the schema name from the root XML tag.
+func schemaFromRawXML(xmlContent string) string {
+	lower := strings.ToLower(xmlContent)
+	switch {
+	case strings.Contains(lower, "<nfeproc") || strings.Contains(lower, "<nfproc"):
+		return "procNFe_v4.00.xsd"
+	case strings.Contains(lower, "<cteproc"):
+		return "procCTe_v4.00.xsd"
+	case strings.Contains(lower, "<mdfeproc"):
+		return "procMDFe_v3.00.xsd"
+	default:
+		return "procNFe_v4.00.xsd"
+	}
 }

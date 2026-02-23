@@ -34,6 +34,58 @@ const exporting = ref(false)
 
 const backfilling = ref(false)
 
+type AutoImportResult = {
+  by_empresa: Record<string, { imported: number; failed: number; errors?: string[] }>
+  unknown: number
+}
+
+// Import
+const importOpen = ref(false)
+const importing = ref(false)
+const importFiles = ref<File[]>([])
+const importResult = ref<AutoImportResult | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const importFileLabel = computed(() => {
+  if (importFiles.value.length === 0) return 'Clique para selecionar arquivos'
+  if (importFiles.value.length === 1) return importFiles.value[0]!.name
+  return `${importFiles.value.length} arquivo(s) selecionado(s)`
+})
+
+function onImportFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  importFiles.value = Array.from(input.files ?? [])
+  importResult.value = null
+}
+
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+async function handleImport() {
+  if (importFiles.value.length === 0) return
+  importing.value = true
+  importResult.value = null
+  try {
+    const form = new FormData()
+    for (const f of importFiles.value) form.append('files', f)
+    const result = await $fetch<AutoImportResult>('/api/documentos/import', { method: 'POST', body: form })
+    importResult.value = result
+    const total = Object.values(result.by_empresa).reduce((s, r) => s + r.imported, 0)
+    if (total > 0) refresh()
+  } catch {
+    toast.add({ title: 'Erro ao importar documentos', color: 'error' })
+  } finally {
+    importing.value = false
+  }
+}
+
+function closeImport() {
+  importOpen.value = false
+  importFiles.value = []
+  importResult.value = null
+}
+
 const xmlOpen = ref(false)
 const xmlLoading = ref(false)
 const xmlContent = ref('')
@@ -223,6 +275,14 @@ function downloadBlob(blob: Blob, fileName: string) {
 
         <template #right>
           <UButton
+            label="Importar"
+            icon="i-lucide-upload"
+            color="neutral"
+            variant="outline"
+            size="sm"
+            @click="importOpen = true"
+          />
+          <UButton
             label="Recarregar"
             color="neutral"
             variant="outline"
@@ -265,6 +325,67 @@ function downloadBlob(blob: Blob, fileName: string) {
       </DocumentosTable>
     </template>
   </UDashboardPanel>
+
+  <UModal v-model:open="importOpen" title="Importar documentos" description="A empresa é detectada automaticamente pelo CNPJ de cada XML." :ui="{ footer: 'justify-end' }">
+    <template #body>
+      <div class="space-y-4">
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept=".xml,.zip"
+          multiple
+          class="hidden"
+          @change="onImportFileChange"
+        >
+
+        <button
+          type="button"
+          class="w-full flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-lg p-8 transition-colors"
+          :class="importFiles.length > 0 ? 'border-primary bg-primary/5' : 'border-default hover:border-primary'"
+          @click="triggerFileInput"
+        >
+          <UIcon
+            :name="importFiles.length > 0 ? 'i-lucide-file-check' : 'i-lucide-file-up'"
+            class="size-8"
+            :class="importFiles.length > 0 ? 'text-primary' : 'text-muted'"
+          />
+          <span class="text-sm font-medium" :class="importFiles.length > 0 ? 'text-primary' : 'text-muted'">
+            {{ importFileLabel }}
+          </span>
+          <span class="text-xs text-dimmed">XML ou ZIP · múltiplos arquivos · máx 200 MB total</span>
+        </button>
+
+        <div v-if="importResult" class="space-y-2">
+          <div
+            v-for="(r, empresa) in importResult.by_empresa"
+            :key="empresa"
+            class="rounded-lg px-3 py-2 text-sm"
+            :class="r.failed > 0 ? 'bg-warning/10' : 'bg-success/10'"
+          >
+            <p class="font-medium text-highlighted truncate">{{ empresa }}</p>
+            <p class="text-xs text-muted mt-0.5">
+              {{ r.imported }} importado{{ r.imported !== 1 ? 's' : '' }}
+              <template v-if="r.failed > 0"> · {{ r.failed }} falha{{ r.failed !== 1 ? 's' : '' }}</template>
+            </p>
+          </div>
+          <p v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
+            {{ importResult.unknown }} arquivo(s) sem empresa correspondente — verifique se a empresa está cadastrada.
+          </p>
+        </div>
+      </div>
+    </template>
+
+    <template #footer>
+      <UButton label="Cancelar" color="neutral" variant="ghost" @click="closeImport" />
+      <UButton
+        label="Importar"
+        icon="i-lucide-upload"
+        :loading="importing"
+        :disabled="importFiles.length === 0 || importing"
+        @click="handleImport"
+      />
+    </template>
+  </UModal>
 
   <UModal
     v-model:open="exportOpen"
