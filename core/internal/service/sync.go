@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -17,8 +18,11 @@ import (
 
 const (
 	maxSyncLoops     = 12
-	loopSleepSeconds = 2
+	loopSleepMinSecs = 2
+	loopSleepMaxSecs = 4
 	minSyncInterval  = time.Hour
+	throttleBase     = time.Hour
+	throttleMax      = 4 * time.Hour
 )
 
 type SyncService struct {
@@ -48,6 +52,15 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 
 	ctx := context.Background()
 	siglaUF := normalizeSiglaUF(firstNonEmpty(empresa.SiglaUF, empresa.Estado))
+
+	if empresa.SyncState != nil && empresa.SyncState.BlockedUntil != nil {
+		if time.Now().Before(*empresa.SyncState.BlockedUntil) {
+			s.log.Debug().Str("cnpj", empresa.CNPJ).
+				Time("blocked_until", *empresa.SyncState.BlockedUntil).
+				Msg("skipping, still blocked by SEFAZ")
+			return nil
+		}
+	}
 
 	if empresa.UltimaSincronizacao != nil {
 		if time.Since(*empresa.UltimaSincronizacao) < minSyncInterval {
@@ -90,6 +103,22 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 	lastXMotivo := ""
 	lastMaxNSU := ""
 
+	// Persist progress on any exit path so we never re-request already-seen NSUs.
+	progressSaved := false
+	defer func() {
+		if progressSaved {
+			return
+		}
+		now := time.Now()
+		_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
+			UltNSU:              &currentNSU,
+			MaxNSU:              &lastMaxNSU,
+			UltimaSincronizacao: &now,
+			UltimoCStat:         &lastCStat,
+			UltimoXMotivo:       &lastXMotivo,
+		})
+	}()
+
 	for iteration := 1; iteration <= maxSyncLoops; iteration++ {
 		resp, err := s.client.DistDFe(
 			ctx,
@@ -129,18 +158,18 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 			Int("iteration", iteration).
 			Str("cstat", cStat).
 			Str("xmotivo", xMotivo).
+			Str("ult_nsu", currentNSU).
+			Str("max_nsu", lastMaxNSU).
 			Msg("sefaz response")
 
 		if cStat == "656" {
-			retryAfter := resp.RetryAfter
-			if retryAfter <= 0 {
-				retryAfter = int(time.Hour.Seconds())
-			}
+			blockDuration := s.computeThrottleBlock(empresa)
 
-			s.rateLimiter.MarkThrottled(empresa.CNPJ, retryAfter)
+			s.rateLimiter.MarkThrottled(empresa.CNPJ, int(blockDuration.Seconds()))
 
 			now := time.Now()
-			blockedUntil := now.Add(time.Duration(retryAfter) * time.Second)
+			blockedUntil := now.Add(blockDuration)
+			progressSaved = true
 			if err := s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
 				UltNSU:              &currentNSU,
 				UltimaSincronizacao: &now,
@@ -152,12 +181,19 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 				s.log.Warn().Err(err).Uint("empresa_id", empresa.ID).Msg("failed to persist sync state after throttle")
 			}
 
+			s.log.Warn().
+				Str("cnpj", empresa.CNPJ).
+				Dur("block_duration", blockDuration).
+				Time("blocked_until", blockedUntil).
+				Msg("sefaz throttle (656), backing off")
+
 			return fmt.Errorf("sefaz throttle: %s", xMotivo)
 		}
 
 		if cStat == "137" {
 			now := time.Now()
 			blockedUntil := now.Add(time.Hour)
+			progressSaved = true
 			_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
 				UltNSU:              &currentNSU,
 				UltimaSincronizacao: &now,
@@ -167,7 +203,7 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 				UltimoXMotivo:       &xMotivo,
 			})
 
-			s.log.Info().Str("cnpj", empresa.CNPJ).Msg("no documents available")
+			s.log.Info().Str("cnpj", empresa.CNPJ).Msg("no documents available (137), blocked for 1h")
 			break
 		}
 
@@ -225,16 +261,25 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 			totalDocs += len(docs)
 		}
 
+		// Persist NSU after each successful iteration so progress is never lost.
+		_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
+			UltNSU:        &currentNSU,
+			MaxNSU:        &lastMaxNSU,
+			UltimoCStat:   &lastCStat,
+			UltimoXMotivo: &lastXMotivo,
+		})
+
 		if parsed.UltNSU == parsed.MaxNSU || parsed.UltNSU == "" {
 			break
 		}
 
 		if iteration < maxSyncLoops {
-			time.Sleep(loopSleepSeconds * time.Second)
+			sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
 		}
 	}
 
 	now := time.Now()
+	progressSaved = true
 	if err := s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
 		UltNSU:              &currentNSU,
 		MaxNSU:              &lastMaxNSU,
@@ -255,6 +300,38 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 		Msg("sync completed")
 
 	return nil
+}
+
+// computeThrottleBlock returns a progressive block duration.
+// If the previous cStat was already 656, doubles the base (capped at throttleMax).
+func (s *SyncService) computeThrottleBlock(empresa model.Empresa) time.Duration {
+	block := throttleBase
+
+	if empresa.SyncState != nil && empresa.SyncState.UltimoCStat == "656" {
+		if empresa.SyncState.BlockedUntil != nil {
+			prevBlock := empresa.SyncState.BlockedUntil.Sub(empresa.SyncState.UpdatedAt)
+			if prevBlock > 0 {
+				block = prevBlock * 2
+			}
+		} else {
+			block = throttleBase * 2
+		}
+	}
+
+	if block > throttleMax {
+		block = throttleMax
+	}
+	if block < throttleBase {
+		block = throttleBase
+	}
+
+	return block
+}
+
+func sleepWithJitter(minSecs, maxSecs int) {
+	jitter := time.Duration(minSecs)*time.Second +
+		time.Duration(rand.Intn((maxSecs-minSecs)*1000+1))*time.Millisecond
+	time.Sleep(jitter)
 }
 
 func buildDocumentSearchText(empresaCNPJ string, d Document) string {

@@ -216,6 +216,16 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 
 	updated, _ := h.svc.GetByID(id)
 	writeJSON(w, http.StatusOK, toEmpresaResponse(*updated))
+
+	if updated != nil && h.syncService != nil {
+		go func() {
+			if err := h.syncService.SyncEmpresa(*updated); err != nil {
+				h.log.Warn().Err(err).Uint("empresa_id", id).Msg("first sync after certificate upload failed")
+			} else {
+				h.log.Info().Uint("empresa_id", id).Msg("first sync after certificate upload completed")
+			}
+		}()
+	}
 }
 
 func (h *EmpresaHandler) Sync(w http.ResponseWriter, r *http.Request) {

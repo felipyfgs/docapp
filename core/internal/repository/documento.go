@@ -125,7 +125,24 @@ func (r *DocumentoRepository) UpsertMany(ctx context.Context, docs []model.Docum
 	}
 
 	_, err := r.db.NewInsert().Model(&docs).
-		On("CONFLICT (empresa_id, nsu) DO NOTHING").
+		On("CONFLICT (empresa_id, nsu) DO UPDATE").
+		Set("chave_acesso = EXCLUDED.chave_acesso").
+		Set("tipo_documento = EXCLUDED.tipo_documento").
+		Set("status_documento = EXCLUDED.status_documento").
+		Set("numero_documento = EXCLUDED.numero_documento").
+		Set("emitente_nome = EXCLUDED.emitente_nome").
+		Set("emitente_cnpj = EXCLUDED.emitente_cnpj").
+		Set("destinatario_nome = EXCLUDED.destinatario_nome").
+		Set("destinatario_cnpj = EXCLUDED.destinatario_cnpj").
+		Set("competencia = EXCLUDED.competencia").
+		Set("schema_nome = EXCLUDED.schema_nome").
+		Set("xml_object_key = EXCLUDED.xml_object_key").
+		Set("xml_sha256 = EXCLUDED.xml_sha256").
+		Set("xml_size_bytes = EXCLUDED.xml_size_bytes").
+		Set("xml_resumo = EXCLUDED.xml_resumo").
+		Set("data_emissao = EXCLUDED.data_emissao").
+		Set("search_text = EXCLUDED.search_text").
+		Set("updated_at = EXCLUDED.updated_at").
 		Exec(ctx)
 	return err
 }

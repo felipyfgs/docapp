@@ -226,11 +226,21 @@ func extractChaveAcesso(xmlContent string) string {
 }
 
 func extractEmitenteNome(xmlContent string) string {
-	return extractPartyName(xmlContent, "emit")
+	if name := extractPartyName(xmlContent, "emit"); name != "" {
+		return name
+	}
+	return extractTagValue(xmlContent, "xNome")
 }
 
 func extractEmitenteCNPJ(xmlContent string) string {
-	return extractPartyCNPJ(xmlContent, "emit")
+	if cnpj := extractPartyCNPJ(xmlContent, "emit"); cnpj != "" {
+		return cnpj
+	}
+	v := digitsOnly(extractTagValue(xmlContent, "CNPJ"))
+	if len(v) == 14 {
+		return v
+	}
+	return ""
 }
 
 func extractDestinatarioNome(xmlContent string) string {
@@ -252,7 +262,14 @@ func extractDestinatarioCNPJ(xmlContent string) string {
 }
 
 func extractNumeroDocumento(xmlContent string) string {
-	return extractTagValue(xmlContent, "nNF", "nCT", "nNFS", "nDoc")
+	if n := extractTagValue(xmlContent, "nNF", "nCT", "nNFS", "nDoc"); n != "" {
+		return n
+	}
+	chave := extractChaveAcesso(xmlContent)
+	if len(chave) == 44 {
+		return strings.TrimLeft(chave[25:34], "0")
+	}
+	return ""
 }
 
 func extractStatusDocumento(xmlContent string) string {
