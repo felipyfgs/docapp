@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 	"time"
 
@@ -79,6 +80,12 @@ func run(log zerolog.Logger, empresaService *service.EmpresaService, syncService
 		log.Info().Msg("worker: no empresas with certificates to sync")
 		return
 	}
+
+	sort.SliceStable(empresas, func(i, j int) bool {
+		iNew := empresas[i].UltimaSincronizacao == nil
+		jNew := empresas[j].UltimaSincronizacao == nil
+		return iNew && !jNew
+	})
 
 	log.Info().Int("total", len(empresas)).Msg("worker: starting sync cycle")
 

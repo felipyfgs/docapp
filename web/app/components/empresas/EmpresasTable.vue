@@ -26,7 +26,7 @@ const UDropdownMenu = resolveComponent('UDropdownMenu')
 const table = useTemplateRef<{ tableApi: any }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
-const columnVisibility = ref<Record<string, boolean>>({ nome_fantasia: false })
+const columnVisibility = ref<Record<string, boolean>>({})
 const rowSelection = ref<Record<string, boolean>>({})
 
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
@@ -131,36 +131,13 @@ const columns: TableColumn<Empresa>[] = [
       })
   },
   {
-    accessorKey: 'cnpj',
-    header: 'CNPJ',
-    cell: ({ row }) => h('span', { class: 'font-mono text-sm whitespace-nowrap' }, formatCNPJ(row.original.cnpj))
-  },
-  {
     accessorKey: 'razao_social',
     header: ({ column }) => {
       const isSorted = column.getIsSorted()
       return h(UButton, {
         color: 'neutral',
         variant: 'ghost',
-        label: 'Razão Social',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    }
-  },
-  {
-    accessorKey: 'nome_fantasia',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Nome Fantasia',
+        label: 'Empresa',
         icon: isSorted
           ? isSorted === 'asc'
             ? 'i-lucide-arrow-up-narrow-wide'
@@ -170,7 +147,10 @@ const columns: TableColumn<Empresa>[] = [
         onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
       })
     },
-    cell: ({ row }) => row.original.nome_fantasia || '—'
+    cell: ({ row }) => h('div', { class: 'min-w-56' }, [
+      h('p', { class: 'font-medium text-highlighted truncate' }, row.original.razao_social),
+      h('p', { class: 'text-xs text-muted' }, formatCNPJ(row.original.cnpj))
+    ])
   },
   {
     accessorKey: 'situacao_cadastral',
@@ -316,9 +296,7 @@ const columns: TableColumn<Empresa>[] = [
 ]
 
 const columnLabels: Record<string, string> = {
-  cnpj: 'CNPJ',
-  razao_social: 'Razão Social',
-  nome_fantasia: 'Nome Fantasia',
+  razao_social: 'Empresa',
   situacao_cadastral: 'Situação',
   localidade: 'Cidade/UF',
   lookback_days: 'Período',

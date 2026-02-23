@@ -299,7 +299,152 @@ func (s *SyncService) SyncEmpresa(empresa model.Empresa) error {
 		Str("ult_nsu", currentNSU).
 		Msg("sync completed")
 
+	s.processarResumosPendentes(ctx, empresa, siglaUF)
+
 	return nil
+}
+
+func (s *SyncService) processarResumosPendentes(ctx context.Context, empresa model.Empresa, siglaUF string) {
+	pendentes, err := s.documentoRepo.ListPendingManifestacao(ctx, empresa.ID)
+	if err != nil {
+		s.log.Warn().Err(err).Uint("empresa_id", empresa.ID).Msg("failed to list pending manifestacao")
+		return
+	}
+
+	if len(pendentes) == 0 {
+		return
+	}
+
+	s.log.Info().
+		Uint("empresa_id", empresa.ID).
+		Int("pendentes", len(pendentes)).
+		Msg("processing pending resNFe manifestations")
+
+	for _, doc := range pendentes {
+		// 1. Enviar Ciencia da Emissao (210210)
+		manifResp, err := s.client.Manifesta(
+			ctx,
+			empresa.CertificadoPFX,
+			empresa.CertificadoSenha,
+			empresa.CNPJ,
+			empresa.RazaoSocial,
+			siglaUF,
+			empresa.TpAmb,
+			doc.ChaveAcesso,
+			"210210",
+			"",
+		)
+		if err != nil {
+			s.log.Warn().Err(err).
+				Str("chave", doc.ChaveAcesso).
+				Msg("ciencia failed, skipping download")
+			continue
+		}
+
+		manifCStat := firstNonEmpty(manifResp.CStat)
+		s.log.Debug().
+			Str("chave", doc.ChaveAcesso).
+			Str("cstat", manifCStat).
+			Str("xmotivo", manifResp.XMotivo).
+			Msg("ciencia response")
+
+		// cStat 135 = evento registrado com sucesso, 573 = duplicidade (ja manifestado)
+		if manifCStat != "135" && manifCStat != "573" {
+			s.log.Warn().
+				Str("chave", doc.ChaveAcesso).
+				Str("cstat", manifCStat).
+				Str("xmotivo", manifResp.XMotivo).
+				Msg("ciencia rejected by SEFAZ")
+			continue
+		}
+
+		now := time.Now()
+		_ = s.documentoRepo.UpdateManifestacaoStatus(ctx, doc.ID, "ciencia", now)
+
+		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
+
+		// 2. Download XML completo via sefazDownload
+		dlResp, err := s.client.DownloadByKey(
+			ctx,
+			empresa.CertificadoPFX,
+			empresa.CertificadoSenha,
+			empresa.CNPJ,
+			empresa.RazaoSocial,
+			siglaUF,
+			empresa.TpAmb,
+			doc.ChaveAcesso,
+		)
+		if err != nil {
+			s.log.Warn().Err(err).
+				Str("chave", doc.ChaveAcesso).
+				Msg("download by key failed after ciencia")
+			continue
+		}
+
+		dlCStat := firstNonEmpty(dlResp.CStat)
+		if dlCStat != "138" && dlCStat != "140" {
+			s.log.Warn().
+				Str("chave", doc.ChaveAcesso).
+				Str("cstat", dlCStat).
+				Str("xmotivo", dlResp.XMotivo).
+				Msg("download returned unexpected cstat")
+			continue
+		}
+
+		// Parse o XML completo do download (vem dentro do retDistDFeInt)
+		dlParsed, err := ParseDistDFeResponse(dlResp.RawXML)
+		if err != nil || len(dlParsed.Documents) == 0 {
+			s.log.Warn().Err(err).
+				Str("chave", doc.ChaveAcesso).
+				Msg("failed to parse downloaded XML")
+			continue
+		}
+
+		fullDoc := dlParsed.Documents[0]
+
+		// Salvar XML completo no minio (substitui o resumo)
+		xmlObjectKey := s.storage.BuildDocumentKey(
+			fullDoc.DocumentType,
+			fullDoc.Competencia,
+			empresa.CNPJ,
+			doc.ChaveAcesso+".xml",
+		)
+		if err := s.storage.PutObject(ctx, xmlObjectKey, "application/xml", []byte(fullDoc.XML)); err != nil {
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("failed to upload full xml")
+			continue
+		}
+
+		xmlHash := sha256.Sum256([]byte(fullDoc.XML))
+		searchText := buildDocumentSearchText(empresa.CNPJ, fullDoc)
+
+		// Atualizar doc no banco
+		if err := s.documentoRepo.UpgradeFromResumo(ctx, doc.ID, model.DocumentoFiscal{
+			XMLObjectKey:       xmlObjectKey,
+			XMLSHA256:          hex.EncodeToString(xmlHash[:]),
+			XMLSizeBytes:       len(fullDoc.XML),
+			EmitenteNome:       fullDoc.EmitenteNome,
+			EmitenteCNPJ:       fullDoc.EmitenteCNPJ,
+			DestinatarioNome:   fullDoc.DestinatarioNome,
+			DestinatarioCNPJ:   fullDoc.DestinatarioCNPJ,
+			NumeroDocumento:    fullDoc.NumeroDocumento,
+			StatusDocumento:    fullDoc.StatusDocumento,
+			Schema:             fullDoc.Schema,
+			SearchText:         searchText,
+			ManifestacaoStatus: "ciencia",
+			ManifestacaoAt:     &now,
+		}); err != nil {
+			s.log.Warn().Err(err).Str("chave", doc.ChaveAcesso).Msg("failed to upgrade doc from resumo")
+			continue
+		}
+
+		s.log.Info().
+			Str("chave", doc.ChaveAcesso).
+			Str("emitente", fullDoc.EmitenteNome).
+			Str("numero", fullDoc.NumeroDocumento).
+			Msg("upgraded resNFe to full XML")
+
+		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
+	}
 }
 
 // computeThrottleBlock returns a progressive block duration.

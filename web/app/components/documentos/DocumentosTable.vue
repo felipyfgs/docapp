@@ -128,6 +128,18 @@ function tipoBadge(documento: DocumentoFiscal): { label: string, color: 'primary
   return map[documento.tipo_documento as keyof typeof map] ?? map.desconhecido
 }
 
+function manifestacaoBadge(status: string | undefined): { label: string, color: 'success' | 'info' | 'error' | 'warning' | 'neutral' } {
+  const map = {
+    ciencia: { label: 'Ciência', color: 'info' },
+    confirmada: { label: 'Confirmada', color: 'success' },
+    desconhecida: { label: 'Desconhecida', color: 'error' },
+    nao_realizada: { label: 'Não Realizada', color: 'warning' }
+  } as const
+
+  if (!status) return { label: 'Pendente', color: 'neutral' }
+  return map[status as keyof typeof map] ?? { label: status, color: 'neutral' }
+}
+
 function statusBadge(documento: DocumentoFiscal): { label: string, color: 'success' | 'error' | 'warning' | 'neutral' } {
   const map = {
     autorizada: { label: 'Autorizada', color: 'success' },
@@ -159,7 +171,21 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   },
   {
     accessorKey: 'emitente_nome',
-    header: 'Emitente',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Emitente',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => h('div', { class: 'min-w-48' }, [
       h('p', { class: 'font-medium text-highlighted truncate' }, row.original.emitente_nome || '—'),
       h('p', { class: 'text-xs text-muted truncate' }, formatCNPJ(row.original.emitente_cnpj))
@@ -196,12 +222,40 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   },
   {
     accessorKey: 'numero_documento',
-    header: 'Número',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Número',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => row.original.numero_documento || '—'
   },
   {
     accessorKey: 'competencia',
-    header: 'Competência',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Competência',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
     cell: ({ row }) => row.original.competencia || '—'
   },
   {
@@ -211,6 +265,15 @@ const columns: TableColumn<DocumentoFiscal>[] = [
       variant: 'subtle',
       color: row.original.xml_resumo ? 'warning' : 'success'
     }, () => row.original.xml_resumo ? 'Resumo' : 'Completo')
+  },
+  {
+    accessorKey: 'manifestacao_status',
+    header: 'Manifestação',
+    cell: ({ row }) => {
+      const status = row.original.manifestacao_status
+      const badge = manifestacaoBadge(status)
+      return h(UBadge, { variant: 'subtle', color: badge.color }, () => badge.label)
+    }
   },
   {
     id: 'actions',

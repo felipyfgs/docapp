@@ -14,5 +14,6 @@ Route::prefix('v1/sefaz')->group(function () {
     Route::post('/distdfe', [SefazController::class, 'distDFe']);
     Route::post('/download', [SefazController::class, 'download']);
     Route::post('/consulta', [SefazController::class, 'consulta']);
+    Route::post('/manifesta', [SefazController::class, 'manifesta']);
     Route::post('/danfe', [SefazController::class, 'danfe']);
 });

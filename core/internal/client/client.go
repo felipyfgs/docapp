@@ -55,6 +55,18 @@ type ConsultaChaveRequest struct {
 	Chave          string `json:"chave"`
 }
 
+type ManifestaRequest struct {
+	CertificadoPFX string `json:"certificado_pfx"`
+	Senha          string `json:"senha"`
+	CNPJ           string `json:"cnpj"`
+	RazaoSocial    string `json:"razao_social"`
+	SiglaUF        string `json:"sigla_uf"`
+	TpAmb          int    `json:"tp_amb"`
+	Chave          string `json:"chave"`
+	TpEvento       string `json:"tp_evento"`
+	Justificativa  string `json:"justificativa,omitempty"`
+}
+
 type DanfeRequest struct {
 	Tipo string `json:"tipo"`
 	XML  string `json:"xml"`
@@ -165,6 +177,41 @@ func (c *Client) ConsultaChave(ctx context.Context, pfx []byte, senha, cnpj, raz
 	}
 
 	status, body, err := c.post(ctx, "/v1/sefaz/consulta", payload)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp SefazResponse
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parsing response: %w", err)
+	}
+
+	if status >= 400 {
+		return &resp, fmt.Errorf("sefaz error: %s", resp.Error)
+	}
+
+	return &resp, nil
+}
+
+func (c *Client) Manifesta(ctx context.Context, pfx []byte, senha, cnpj, razaoSocial, siglaUF string, tpAmb int, chave, tpEvento, justificativa string) (*SefazResponse, error) {
+	req := ManifestaRequest{
+		CertificadoPFX: base64.StdEncoding.EncodeToString(pfx),
+		Senha:          senha,
+		CNPJ:           cnpj,
+		RazaoSocial:    razaoSocial,
+		SiglaUF:        siglaUF,
+		TpAmb:          tpAmb,
+		Chave:          chave,
+		TpEvento:       tpEvento,
+		Justificativa:  justificativa,
+	}
+
+	payload, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	status, body, err := c.post(ctx, "/v1/sefaz/manifesta", payload)
 	if err != nil {
 		return nil, err
 	}

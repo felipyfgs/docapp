@@ -107,6 +107,43 @@ class SefazController extends Controller
         }
     }
 
+    public function manifesta(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'certificado_pfx' => ['required', 'string'],
+            'senha' => ['required', 'string'],
+            'cnpj' => ['required', 'string', 'size:14'],
+            'razao_social' => ['required', 'string'],
+            'sigla_uf' => ['required', 'string', 'size:2'],
+            'tp_amb' => ['required', 'integer', 'in:1,2'],
+            'chave' => ['required', 'string', 'size:44'],
+            'tp_evento' => ['required', 'string', 'in:210200,210210,210220,210240'],
+            'justificativa' => ['nullable', 'string', 'min:15', 'max:255'],
+        ]);
+
+        try {
+            $tools = $this->makeTools($validated);
+            $rawXml = $tools->sefazManifesta(
+                (string) $validated['chave'],
+                (string) $validated['tp_evento'],
+                (string) ($validated['justificativa'] ?? ''),
+                1,
+            );
+
+            return response()->json([
+                'raw_xml' => $rawXml,
+                'cstat' => $this->extractCstat($rawXml),
+                'xmotivo' => $this->extractXMotivo($rawXml),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function danfe(Request $request): JsonResponse
     {
         $validated = $request->validate([

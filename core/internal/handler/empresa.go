@@ -220,9 +220,9 @@ func (h *EmpresaHandler) UploadCertificado(w http.ResponseWriter, r *http.Reques
 	if updated != nil && h.syncService != nil {
 		go func() {
 			if err := h.syncService.SyncEmpresa(*updated); err != nil {
-				h.log.Warn().Err(err).Uint("empresa_id", id).Msg("first sync after certificate upload failed")
+				h.log.Warn().Err(err).Uint("empresa_id", id).Msg("auto-sync after certificate upload failed")
 			} else {
-				h.log.Info().Uint("empresa_id", id).Msg("first sync after certificate upload completed")
+				h.log.Info().Uint("empresa_id", id).Msg("auto-sync after certificate upload completed")
 			}
 		}()
 	}

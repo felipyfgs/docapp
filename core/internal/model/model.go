@@ -144,8 +144,10 @@ type DocumentoFiscal struct {
 	XMLSHA256        string     `bun:"xml_sha256" json:"-"`
 	XMLSizeBytes     int        `bun:"xml_size_bytes" json:"-"`
 	XMLResumo        bool       `bun:"xml_resumo,notnull" json:"xml_resumo"`
-	DanfeObjectKey   string     `json:"danfe_object_key"`
-	DanfeGeneratedAt *time.Time `bun:"danfe_generated_at,nullzero" json:"danfe_generated_at"`
-	DataEmissao      *time.Time `bun:"data_emissao,nullzero" json:"data_emissao"`
-	SearchText       string     `bun:"search_text,notnull" json:"-"`
+	DanfeObjectKey     string     `json:"danfe_object_key"`
+	DanfeGeneratedAt   *time.Time `bun:"danfe_generated_at,nullzero" json:"danfe_generated_at"`
+	DataEmissao        *time.Time `bun:"data_emissao,nullzero" json:"data_emissao"`
+	SearchText         string     `bun:"search_text,notnull" json:"-"`
+	ManifestacaoStatus string     `bun:"manifestacao_status,nullzero" json:"manifestacao_status"`
+	ManifestacaoAt     *time.Time `bun:"manifestacao_at,nullzero" json:"manifestacao_at"`
 }

@@ -166,6 +166,57 @@ func (r *DocumentoRepository) UpdateDanfeMetadata(ctx context.Context, id uint, 
 	return nil
 }
 
+func (r *DocumentoRepository) UpgradeFromResumo(ctx context.Context, id uint, doc model.DocumentoFiscal) error {
+	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
+		Set("xml_resumo = ?", false).
+		Set("xml_object_key = ?", doc.XMLObjectKey).
+		Set("xml_sha256 = ?", doc.XMLSHA256).
+		Set("xml_size_bytes = ?", doc.XMLSizeBytes).
+		Set("emitente_nome = ?", doc.EmitenteNome).
+		Set("emitente_cnpj = ?", doc.EmitenteCNPJ).
+		Set("destinatario_nome = ?", doc.DestinatarioNome).
+		Set("destinatario_cnpj = ?", doc.DestinatarioCNPJ).
+		Set("numero_documento = ?", doc.NumeroDocumento).
+		Set("status_documento = ?", doc.StatusDocumento).
+		Set("schema_nome = ?", doc.Schema).
+		Set("search_text = ?", doc.SearchText).
+		Set("manifestacao_status = ?", doc.ManifestacaoStatus).
+		Set("manifestacao_at = ?", doc.ManifestacaoAt).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", id).
+		Where("deleted_at IS NULL").
+		Exec(ctx)
+	return err
+}
+
+func (r *DocumentoRepository) UpdateManifestacaoStatus(ctx context.Context, id uint, status string, at time.Time) error {
+	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
+		Set("manifestacao_status = ?", status).
+		Set("manifestacao_at = ?", at).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", id).
+		Where("deleted_at IS NULL").
+		Exec(ctx)
+	return err
+}
+
+func (r *DocumentoRepository) ListPendingManifestacao(ctx context.Context, empresaID uint) ([]model.DocumentoFiscal, error) {
+	docs := make([]model.DocumentoFiscal, 0)
+	err := r.db.NewSelect().Model(&docs).
+		Where("df.empresa_id = ?", empresaID).
+		Where("df.deleted_at IS NULL").
+		Where("df.xml_resumo = TRUE").
+		Where("df.manifestacao_status IS NULL").
+		Where("df.chave_acesso IS NOT NULL").
+		Where("df.chave_acesso != ''").
+		OrderExpr("df.data_emissao DESC NULLS LAST").
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
 func applyDocumentoFilters(query *bun.SelectQuery, filter DocumentoListFilter) *bun.SelectQuery {
 	if filter.EmpresaID > 0 {
 		query = query.Where("df.empresa_id = ?", filter.EmpresaID)

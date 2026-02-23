@@ -110,6 +110,8 @@ export interface DocumentoFiscal {
   danfe_object_key?: string
   danfe_generated_at?: string
   data_emissao?: string
+  manifestacao_status?: string
+  manifestacao_at?: string
   created_at: string
 }
 
