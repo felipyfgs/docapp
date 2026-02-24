@@ -320,11 +320,11 @@ func (h *EmpresaHandler) Overview(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, map[string]interface{}{
-		"empresa":                  toEmpresaResponse(*empresa),
-		"sync_state":               syncState,
-		"stats":                    stats,
+		"empresa":                    toEmpresaResponse(*empresa),
+		"sync_state":                 syncState,
+		"stats":                      stats,
 		"documentos_por_competencia": porCompetencia,
-		"documentos_recentes":      recentes,
+		"documentos_recentes":        recentes,
 	})
 }
 

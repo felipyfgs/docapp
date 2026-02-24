@@ -307,9 +307,9 @@ func (r *DocumentoRepository) ListDocsBloqueadosSemXML(ctx context.Context, empr
 }
 
 type DocumentoStats struct {
-	Total       int `bun:"total"`
-	XMLCompleto int `bun:"xml_completo"`
-	XMLResumo   int `bun:"xml_resumo"`
+	Total        int `bun:"total"`
+	XMLCompleto  int `bun:"xml_completo"`
+	XMLResumo    int `bun:"xml_resumo"`
 	Manifestados int `bun:"manifestados"`
 }
 

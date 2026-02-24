@@ -94,7 +94,7 @@ func main() {
 			if len(manifResp.CStat) > 0 {
 				cStat = manifResp.CStat
 			}
-			
+
 			if cStat != "128" && cStat != "135" && cStat != "573" {
 				log.Warn().
 					Str("chave", doc.ChaveAcesso).

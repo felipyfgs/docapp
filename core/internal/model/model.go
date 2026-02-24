@@ -108,43 +108,43 @@ type EmpresaCertificado struct {
 type EmpresaSyncState struct {
 	bun.BaseModel `bun:"table:empresa_sync_states,alias:ess"`
 
-	EmpresaID           uint       `bun:"empresa_id,pk,notnull" json:"empresa_id"`
-	Empresa             *Empresa   `bun:"rel:belongs-to,join:empresa_id=id" json:"-"`
-	CreatedAt           time.Time  `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
-	UpdatedAt           time.Time  `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
-	DeletedAt           *time.Time `bun:"deleted_at,nullzero" json:"-"`
-	Ativo               bool       `bun:"ativo,notnull" json:"ativo"`
-	LookbackDays        int        `bun:"lookback_days,notnull" json:"lookback_days"`
-	UltNSU              string     `bun:"ult_nsu,notnull" json:"ult_nsu"`
-	MaxNSU              string     `bun:"max_nsu,nullzero" json:"max_nsu"`
-	UltimaSincronizacao *time.Time `bun:"ultima_sincronizacao,nullzero" json:"ultima_sincronizacao"`
-	BlockedUntil        *time.Time `bun:"blocked_until,nullzero" json:"blocked_until"`
+	EmpresaID            uint       `bun:"empresa_id,pk,notnull" json:"empresa_id"`
+	Empresa              *Empresa   `bun:"rel:belongs-to,join:empresa_id=id" json:"-"`
+	CreatedAt            time.Time  `bun:"created_at,notnull,default:current_timestamp" json:"created_at"`
+	UpdatedAt            time.Time  `bun:"updated_at,notnull,default:current_timestamp" json:"updated_at"`
+	DeletedAt            *time.Time `bun:"deleted_at,nullzero" json:"-"`
+	Ativo                bool       `bun:"ativo,notnull" json:"ativo"`
+	LookbackDays         int        `bun:"lookback_days,notnull" json:"lookback_days"`
+	UltNSU               string     `bun:"ult_nsu,notnull" json:"ult_nsu"`
+	MaxNSU               string     `bun:"max_nsu,nullzero" json:"max_nsu"`
+	UltimaSincronizacao  *time.Time `bun:"ultima_sincronizacao,nullzero" json:"ultima_sincronizacao"`
+	BlockedUntil         *time.Time `bun:"blocked_until,nullzero" json:"blocked_until"`
 	DownloadBlockedUntil *time.Time `bun:"download_blocked_until,nullzero" json:"download_blocked_until"`
-	UltimoCStat         string     `bun:"ultimo_cstat" json:"ultimo_cstat"`
-	UltimoXMotivo       string     `bun:"ultimo_xmotivo" json:"ultimo_xmotivo"`
+	UltimoCStat          string     `bun:"ultimo_cstat" json:"ultimo_cstat"`
+	UltimoXMotivo        string     `bun:"ultimo_xmotivo" json:"ultimo_xmotivo"`
 }
 
 type DocumentoFiscal struct {
 	bun.BaseModel `bun:"table:documentos_fiscais,alias:df"`
 
 	Base
-	EmpresaID        uint       `bun:"empresa_id,notnull" json:"empresa_id"`
-	Empresa          *Empresa   `bun:"rel:belongs-to,join:empresa_id=id" json:"empresa,omitempty"`
-	NSU              string     `bun:"nsu,notnull" json:"nsu"`
-	ChaveAcesso      string     `bun:"chave_acesso" json:"chave_acesso"`
-	TipoDocumento    string     `bun:"tipo_documento,notnull" json:"tipo_documento"`
-	StatusDocumento  string     `bun:"status_documento,notnull" json:"status_documento"`
-	NumeroDocumento  string     `bun:"numero_documento" json:"numero_documento"`
-	EmitenteNome     string     `json:"emitente_nome"`
-	EmitenteCNPJ     string     `bun:"emitente_cnpj,nullzero" json:"emitente_cnpj"`
-	DestinatarioNome string     `json:"destinatario_nome"`
-	DestinatarioCNPJ string     `bun:"destinatario_cnpj,nullzero" json:"destinatario_cnpj"`
-	Competencia      string     `json:"competencia"`
-	Schema           string     `bun:"schema_nome" json:"schema"`
-	XMLObjectKey     string     `bun:"xml_object_key,notnull" json:"xml_object_key"`
-	XMLSHA256        string     `bun:"xml_sha256" json:"-"`
-	XMLSizeBytes     int        `bun:"xml_size_bytes" json:"-"`
-	XMLResumo        bool       `bun:"xml_resumo,notnull" json:"xml_resumo"`
+	EmpresaID          uint       `bun:"empresa_id,notnull" json:"empresa_id"`
+	Empresa            *Empresa   `bun:"rel:belongs-to,join:empresa_id=id" json:"empresa,omitempty"`
+	NSU                string     `bun:"nsu,notnull" json:"nsu"`
+	ChaveAcesso        string     `bun:"chave_acesso" json:"chave_acesso"`
+	TipoDocumento      string     `bun:"tipo_documento,notnull" json:"tipo_documento"`
+	StatusDocumento    string     `bun:"status_documento,notnull" json:"status_documento"`
+	NumeroDocumento    string     `bun:"numero_documento" json:"numero_documento"`
+	EmitenteNome       string     `json:"emitente_nome"`
+	EmitenteCNPJ       string     `bun:"emitente_cnpj,nullzero" json:"emitente_cnpj"`
+	DestinatarioNome   string     `json:"destinatario_nome"`
+	DestinatarioCNPJ   string     `bun:"destinatario_cnpj,nullzero" json:"destinatario_cnpj"`
+	Competencia        string     `json:"competencia"`
+	Schema             string     `bun:"schema_nome" json:"schema"`
+	XMLObjectKey       string     `bun:"xml_object_key,notnull" json:"xml_object_key"`
+	XMLSHA256          string     `bun:"xml_sha256" json:"-"`
+	XMLSizeBytes       int        `bun:"xml_size_bytes" json:"-"`
+	XMLResumo          bool       `bun:"xml_resumo,notnull" json:"xml_resumo"`
 	DanfeObjectKey     string     `json:"danfe_object_key"`
 	DanfeGeneratedAt   *time.Time `bun:"danfe_generated_at,nullzero" json:"danfe_generated_at"`
 	DataEmissao        *time.Time `bun:"data_emissao,nullzero" json:"data_emissao"`

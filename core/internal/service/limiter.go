@@ -7,10 +7,10 @@ import (
 )
 
 type RateLimiter struct {
-	mu       sync.RWMutex
-	limits   map[string]*bucket
-	maxHits  int
-	window   time.Duration
+	mu      sync.RWMutex
+	limits  map[string]*bucket
+	maxHits int
+	window  time.Duration
 }
 
 type bucket struct {

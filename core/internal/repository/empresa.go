@@ -13,11 +13,11 @@ import (
 )
 
 type SyncStatePatch struct {
-	Ativo               *bool
-	LookbackDays        *int
-	UltNSU              *string
-	MaxNSU              *string
-	UltimaSincronizacao *time.Time
+	Ativo                   *bool
+	LookbackDays            *int
+	UltNSU                  *string
+	MaxNSU                  *string
+	UltimaSincronizacao     *time.Time
 	BlockedUntil            *time.Time
 	SetBlockedUntil         bool
 	DownloadBlockedUntil    *time.Time

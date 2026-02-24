@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
-	"math/rand"
 	"strings"
 	"time"
 
@@ -220,6 +219,9 @@ func (s *SyncService) syncEmpresa(empresa model.Empresa, force bool) error {
 		}
 
 		var docs []model.DocumentoFiscal
+		if len(parsed.Documents) > 0 {
+			docs = make([]model.DocumentoFiscal, 0, len(parsed.Documents))
+		}
 		for _, d := range parsed.Documents {
 			if d.DataEmissao != nil && d.DataEmissao.Before(cutoff) {
 				continue
@@ -545,11 +547,6 @@ func (s *SyncService) computeThrottleBlock(empresa model.Empresa) time.Duration 
 	return block
 }
 
-func sleepWithJitter(minSecs, maxSecs int) {
-	jitter := time.Duration(minSecs)*time.Second +
-		time.Duration(rand.Intn((maxSecs-minSecs)*1000+1))*time.Millisecond
-	time.Sleep(jitter)
-}
 
 func buildDocumentSearchText(empresaCNPJ string, d Document) string {
 	parts := []string{
@@ -581,26 +578,4 @@ func buildDocumentSearchText(empresaCNPJ string, d Document) string {
 	return b.String()
 }
 
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if strings.TrimSpace(value) != "" {
-			return strings.TrimSpace(value)
-		}
-	}
 
-	return ""
-}
-
-func normalizeSiglaUF(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return ""
-	}
-
-	upper := strings.ToUpper(trimmed)
-	if len(upper) > 2 {
-		return upper[:2]
-	}
-
-	return upper
-}
