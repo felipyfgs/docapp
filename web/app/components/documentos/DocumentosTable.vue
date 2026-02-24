@@ -54,12 +54,12 @@ const pagination = ref({ pageIndex: 0, pageSize: 15 })
 
 const search = defineModel<string>('search', { default: '' })
 
-const competenciaOptions = computed(() => {
-  const all = [...new Set((props.data ?? []).map(d => d.competencia).filter(Boolean))]
-  return all.sort().reverse().map(c => ({ label: c!, value: c! }))
-})
+function dynamicOptions(extractor: (d: DocumentoFiscal) => string | undefined) {
+  const all = [...new Set((props.data ?? []).map(extractor).filter(Boolean))]
+  return all.sort().map(v => ({ label: v!, value: v! }))
+}
 
-const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
+const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
   {
     id: 'tipo_documento',
     accessor: row => row.tipo_documento,
@@ -88,6 +88,22 @@ const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
     ]
   },
   {
+    id: 'emitente',
+    accessor: row => row.emitente_nome || '',
+    displayName: 'Emitente',
+    icon: 'i-lucide-building',
+    type: 'option',
+    options: dynamicOptions(d => d.emitente_nome || undefined)
+  },
+  {
+    id: 'destinatario',
+    accessor: row => row.destinatario_nome || '',
+    displayName: 'Destinatário',
+    icon: 'i-lucide-user',
+    type: 'option',
+    options: dynamicOptions(d => d.destinatario_nome || undefined)
+  },
+  {
     id: 'xml_resumo',
     accessor: row => row.xml_resumo ? 'resumo' : 'completo',
     displayName: 'XML',
@@ -104,7 +120,7 @@ const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
     displayName: 'Competência',
     icon: 'i-lucide-calendar',
     type: 'option',
-    options: competenciaOptions
+    options: dynamicOptions(d => d.competencia)
   },
   {
     id: 'manifestacao_status',
@@ -120,7 +136,7 @@ const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
       { label: 'Não Realizada', value: 'nao_realizada' }
     ]
   }
-]
+])
 
 const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 

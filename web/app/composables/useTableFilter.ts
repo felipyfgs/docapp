@@ -48,7 +48,7 @@ function defaultOperator(type: ColumnDataType): FilterOperator {
 }
 
 export function useTableFilter<TData>(
-  columnsInput: ColumnConfig<TData>[],
+  columnsInput: MaybeRefOrGetter<ColumnConfig<TData>[]>,
   dataInput: TData[] | Ref<TData[]> | (() => TData[])
 ) {
   const filters = ref<FiltersState>([])
@@ -57,6 +57,7 @@ export function useTableFilter<TData>(
     const data = typeof dataInput === 'function'
       ? dataInput()
       : toValue(dataInput)
+    const columns = toValue(columnsInput)
 
     if (filters.value.length === 0) return data
 
@@ -64,7 +65,7 @@ export function useTableFilter<TData>(
       return filters.value.every((filter) => {
         if (filter.values.length === 0) return true
 
-        const col = columnsInput.find(c => c.id === filter.columnId)
+        const col = columns.find(c => c.id === filter.columnId)
         if (!col) return true
 
         const val = col.accessor(row)
@@ -91,7 +92,7 @@ export function useTableFilter<TData>(
   const actions: DataTableFilterActions = {
     addFilter(columnId) {
       if (filters.value.find(f => f.columnId === columnId)) return
-      const col = columnsInput.find(c => c.id === columnId)
+      const col = toValue(columnsInput).find(c => c.id === columnId)
       if (!col) return
       filters.value = [...filters.value, {
         columnId,
