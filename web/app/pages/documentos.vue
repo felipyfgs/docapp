@@ -5,12 +5,6 @@ type DeliveryMode = 'proxy' | 'presigned'
 type ExportFormat = 'xml' | 'danfe' | 'ambos'
 type OrganizationMode = 'tipo/competencia/cnpj' | 'cnpj/competencia/tipo' | 'competencia/cnpj/tipo'
 
-type BackfillResponse = {
-  processed: number
-  uploaded: number
-  skipped: number
-}
-
 const toast = useToast()
 const tableRef = useTemplateRef<{ selectedRows: DocumentoFiscal[] }>('table')
 
@@ -31,8 +25,6 @@ const exportFormat = ref<ExportFormat>('xml')
 const exportOrganization = ref<OrganizationMode>('tipo/competencia/cnpj')
 const exportDeliveryMode = ref<DeliveryMode>('proxy')
 const exporting = ref(false)
-
-const backfilling = ref(false)
 
 type AutoImportResult = {
   by_empresa: Record<string, { imported: number, failed: number, errors?: string[] }>
@@ -275,32 +267,6 @@ async function handleExport() {
   }
 }
 
-async function runBackfill() {
-  backfilling.value = true
-
-  try {
-    const response = await $fetch<BackfillResponse>('/api/documentos/backfill', {
-      method: 'POST',
-      body: { limit: 500 }
-    })
-
-    toast.add({
-      title: 'Backfill concluído',
-      description: `Processados: ${response.processed} • Enviados: ${response.uploaded} • Ignorados: ${response.skipped}`,
-      color: 'success'
-    })
-
-    refresh()
-  } catch (error: unknown) {
-    toast.add({
-      title: getErrorMessage(error, 'Erro ao executar backfill'),
-      color: 'error'
-    })
-  } finally {
-    backfilling.value = false
-  }
-}
-
 function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message
@@ -371,15 +337,6 @@ function downloadBlob(blob: Blob, fileName: string) {
         @view-xml="handleViewXML"
       >
         <template #actions>
-          <UButton
-            :loading="backfilling"
-            label="Backfill XML"
-            color="neutral"
-            variant="outline"
-            icon="i-lucide-database-backup"
-            @click="runBackfill"
-          />
-
           <UButton
             v-if="selectedCount > 0"
             label="Exportar"
