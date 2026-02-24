@@ -81,7 +81,7 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 	totalDocs := 0
 
 	for iteration := 1; iteration <= nfseMaxSyncLoops; iteration++ {
-		resp, err := nfseClient.DistDFe(ctx, currentNSU)
+		resp, rawBody, err := nfseClient.DistDFe(ctx, currentNSU)
 		if err != nil {
 			return fmt.Errorf("nfse distdfe (iteration %d): %w", iteration, err)
 		}
@@ -93,6 +93,18 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 			Str("max_nsu", resp.MaxNSU).
 			Int("docs", len(resp.Documentos)).
 			Msg("nfse adn response")
+
+		if resp.CStat == "" && resp.UltNSU == "" && len(resp.Documentos) == 0 {
+			bodyPreview := rawBody
+			if len(bodyPreview) > 500 {
+				bodyPreview = bodyPreview[:500] + "..."
+			}
+			s.log.Warn().
+				Str("cnpj", empresa.CNPJ).
+				Str("raw_body", bodyPreview).
+				Msg("nfse: ADN returned empty/unexpected response")
+			break
+		}
 
 		if resp.CStat == "137" || len(resp.Documentos) == 0 {
 			break
