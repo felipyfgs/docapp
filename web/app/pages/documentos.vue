@@ -121,7 +121,7 @@ async function registerSelectedEmpresas() {
     if (successCount > 0) {
       toast.add({ title: `${successCount} empresa(s) cadastrada(s)`, color: 'success' })
       selectedUnknownEmpresas.value = []
-      
+
       // Delay handleImport to allow backend DB transactions to settle
       setTimeout(async () => {
         await handleImport()
@@ -427,9 +427,18 @@ function downloadBlob(blob: Blob, fileName: string) {
               </template>
             </p>
           </div>
-          <div v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
+          <div v-if="importResult.unknown > 0 && !importResult.unknown_empresas?.length" class="text-xs text-warning px-1">
             {{ importResult.unknown }} arquivo(s) sem empresa correspondente — verifique se a empresa está cadastrada.
           </div>
+
+          <UAlert
+            v-if="importResult.unknown === 0 && !importResult.unknown_empresas?.length && Object.keys(importResult.by_empresa).length > 0"
+            color="success"
+            variant="subtle"
+            title="Importação concluída!"
+            description="Todos os arquivos válidos foram processados com sucesso."
+            icon="i-lucide-check-circle"
+          />
 
           <div v-if="importResult.unknown_empresas && importResult.unknown_empresas.length > 0" class="mt-4 border border-default rounded-md p-3">
             <div class="text-sm font-medium mb-2">
