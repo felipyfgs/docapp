@@ -478,10 +478,10 @@ function getVisibilityItems() {
     </div>
 
     <UPagination
-      :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-      :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-      :total="table?.tableApi?.getFilteredRowModel().rows.length"
-      @update:page="(page: number) => table?.tableApi?.setPageIndex(page - 1)"
+      :page="pagination.pageIndex + 1"
+      :items-per-page="pagination.pageSize"
+      :total="table?.tableApi?.getFilteredRowModel().rows.length || 0"
+      @update:page="(page: number) => { pagination.pageIndex = page - 1 }"
     />
   </div>
 </template>
