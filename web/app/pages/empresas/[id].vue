@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { h, resolveComponent } from 'vue'
 import { VisXYContainer, VisGroupedBar, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
-import type { EmpresaOverview, CompetenciaCount } from '~/types'
+import type { TableColumn } from '@nuxt/ui'
+import type { EmpresaOverview, CompetenciaCount, DocumentoFiscal } from '~/types'
 
 const route = useRoute()
 const toast = useToast()
@@ -132,17 +134,11 @@ const xTicks = (i: number) => chartData.value[i]?.competencia ?? ''
 const template = (d: CompetenciaCount) => `${d.competencia}: ${d.count} docs`
 
 const statCards = computed(() => [
-  { title: 'Total', icon: 'i-lucide-file-text', value: stats.value.total, color: 'text-primary' },
-  { title: 'XML Completo', icon: 'i-lucide-file-check', value: stats.value.xml_completo, color: 'text-success' },
-  { title: 'XML Resumo', icon: 'i-lucide-file-warning', value: stats.value.xml_resumo, color: 'text-warning' },
-  { title: 'Manifestados', icon: 'i-lucide-shield-check', value: stats.value.manifestados, color: 'text-info' }
+  { title: 'Total de XMLs', icon: 'i-lucide-file-text', value: stats.value.total, color: 'primary' },
+  { title: 'XML Completo', icon: 'i-lucide-file-check', value: stats.value.xml_completo, color: 'success' },
+  { title: 'XML Resumo', icon: 'i-lucide-file-warning', value: stats.value.xml_resumo, color: 'warning' },
+  { title: 'Manifestados', icon: 'i-lucide-shield-check', value: stats.value.manifestados, color: 'info' }
 ])
-
-const accordionItems = [
-  { label: 'Dados Cadastrais', icon: 'i-lucide-building-2', slot: 'cadastro' },
-  { label: 'Certificado & Sincronização', icon: 'i-lucide-shield', slot: 'certificado' },
-  { label: 'Documentos Recentes', icon: 'i-lucide-files', slot: 'documentos' }
-]
 
 function tipoColor(tipo: string) {
   const m: Record<string, string> = { 'nf-e': 'primary', 'nfc-e': 'success', 'ct-e': 'warning', 'nfs-e': 'neutral' }
@@ -153,6 +149,45 @@ function statusColor(s: string) {
   const m: Record<string, string> = { autorizada: 'success', cancelada: 'error', denegada: 'warning' }
   return (m[s] ?? 'neutral') as 'success' | 'error' | 'warning' | 'neutral'
 }
+
+const UBadge = resolveComponent('UBadge')
+const tableColumns: TableColumn<DocumentoFiscal>[] = [
+  {
+    accessorKey: 'emitente_nome',
+    header: 'Emitente',
+    cell: ({ row }) => {
+      return h('div', { class: 'max-w-48 truncate' }, [
+        h('p', { class: 'truncate font-medium text-highlighted' }, row.original.emitente_nome || '—'),
+        h('p', { class: 'text-xs text-muted' }, row.original.emitente_cnpj || '')
+      ])
+    }
+  },
+  {
+    accessorKey: 'numero_documento',
+    header: 'Número',
+    cell: ({ row }) => h('span', { class: 'text-muted' }, row.original.numero_documento || '—')
+  },
+  {
+    accessorKey: 'tipo_documento',
+    header: 'Tipo',
+    cell: ({ row }) => h(UBadge, { color: tipoColor(row.original.tipo_documento), variant: 'subtle', size: 'xs', class: 'uppercase' }, () => row.original.tipo_documento)
+  },
+  {
+    accessorKey: 'status_documento',
+    header: 'Status',
+    cell: ({ row }) => h(UBadge, { color: statusColor(row.original.status_documento), variant: 'subtle', size: 'xs', class: 'capitalize' }, () => row.original.status_documento)
+  },
+  {
+    accessorKey: 'competencia',
+    header: 'Competência',
+    cell: ({ row }) => h('span', { class: 'text-muted' }, row.original.competencia || '—')
+  },
+  {
+    id: 'xml_resumo',
+    header: 'XML',
+    cell: ({ row }) => h(UBadge, { color: row.original.xml_resumo ? 'warning' : 'success', variant: 'subtle', size: 'xs' }, () => row.original.xml_resumo ? 'Resumo' : 'Completo')
+  }
+]
 </script>
 
 <template>
@@ -204,291 +239,204 @@ function statusColor(s: string) {
 
       <template v-else-if="empresa">
         <!-- Empresa header -->
-        <div class="flex flex-wrap items-center gap-2 mb-6">
-          <p class="text-sm text-muted font-mono">
-            {{ formatCNPJ(empresa.cnpj) }}
-          </p>
+        <div class="flex flex-wrap items-center gap-3 mb-6">
           <UBadge
             :color="empresa.situacao_cadastral === 'Ativa' ? 'success' : 'warning'"
             variant="subtle"
-            size="sm"
           >
             {{ empresa.situacao_cadastral || 'Desconhecida' }}
           </UBadge>
-          <UBadge :color="certColor as any" variant="subtle" size="sm">
+          <p class="text-sm text-muted font-mono bg-default rounded-md px-2 py-0.5 border border-default">
+            {{ formatCNPJ(empresa.cnpj) }}
+          </p>
+          <UBadge :color="certColor as any" variant="subtle">
             {{ certLabel }}
           </UBadge>
           <UBadge
             v-if="isBlocked"
             color="error"
             variant="subtle"
-            size="sm"
             icon="i-lucide-lock"
           >
             Bloqueado até {{ formatDate(blockedUntilDate) }}
           </UBadge>
         </div>
 
-        <!-- Stats cards -->
-        <UPageGrid class="lg:grid-cols-4 gap-4 mb-6">
-          <UPageCard
-            v-for="stat in statCards"
-            :key="stat.title"
-            :icon="stat.icon"
-            :title="stat.title"
-            variant="subtle"
-            :ui="{
-              container: 'gap-y-1',
-              wrapper: 'items-start',
-              leading: 'p-2.5 rounded-full bg-primary/10 ring ring-inset ring-primary/25',
-              title: 'font-normal text-muted text-xs uppercase'
-            }"
-          >
-            <span class="text-2xl font-semibold text-highlighted">{{ stat.value }}</span>
-          </UPageCard>
-        </UPageGrid>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left Column: Cert and Company Info -->
+          <div class="space-y-6">
+            <!-- Certificado e Sync -->
+            <UCard>
+              <template #header>
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-shield-check" class="size-5 text-primary" />
+                  <h3 class="font-semibold text-highlighted">
+                    Certificado & Sincronização
+                  </h3>
+                </div>
+              </template>
 
-        <!-- Grafico por competencia -->
-        <UCard
-          v-if="porCompetencia.length > 0"
-          class="mb-6"
-          :ui="{ body: '!px-0 !pb-3 !pt-0' }"
-        >
-          <template #header>
-            <p class="text-xs text-muted uppercase mb-0.5">
-              Documentos por competência
-            </p>
-            <p class="text-2xl font-semibold text-highlighted">
-              {{ stats.total }} docs
-            </p>
-          </template>
+              <div class="space-y-4 text-sm">
+                <div class="flex items-center justify-between">
+                  <span class="text-muted">Status</span>
+                  <UBadge :color="certColor as any" variant="subtle" size="sm">
+                    {{ certLabel }}
+                  </UBadge>
+                </div>
 
-          <VisXYContainer
-            :data="chartData"
-            :padding="{ top: 20, left: 8, right: 8 }"
-            class="h-48"
-          >
-            <VisGroupedBar :x="x" :y="[(d: CompetenciaCount) => d.count]" color="['var(--ui-primary)']" />
-            <VisAxis type="x" :x="x" :tick-format="xTicks" />
-            <VisCrosshair color="var(--ui-primary)" :template="template" />
-            <VisTooltip />
-          </VisXYContainer>
-        </UCard>
+                <div v-if="empresa.certificado_valido_ate" class="flex items-center justify-between">
+                  <span class="text-muted">Válido até</span>
+                  <span class="font-medium">{{ formatDateOnly(empresa.certificado_valido_ate) }}</span>
+                </div>
 
-        <!-- Accordions -->
-        <!-- eslint-disable vue/no-unused-vars -->
-        <UAccordion :items="(accordionItems as any)" type="multiple" :default-value="['cadastro', 'certificado', 'documentos']">
-          <template #cadastro>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 py-4 text-sm">
-              <div>
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Razão Social
-                </p>
-                <p class="font-medium text-highlighted">
-                  {{ empresa.razao_social }}
-                </p>
-              </div>
-              <div v-if="empresa.nome_fantasia">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Nome Fantasia
-                </p>
-                <p>{{ empresa.nome_fantasia }}</p>
-              </div>
-              <div>
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  CNPJ
-                </p>
-                <p class="font-mono">
-                  {{ formatCNPJ(empresa.cnpj) }}
-                </p>
-              </div>
-              <div v-if="empresa.cnae">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  CNAE
-                </p>
-                <p>{{ empresa.cnae }}</p>
-              </div>
-              <div v-if="empresa.porte">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Porte
-                </p>
-                <p>{{ empresa.porte }}</p>
-              </div>
-              <div v-if="empresa.natureza_juridica">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Natureza Jurídica
-                </p>
-                <p>{{ empresa.natureza_juridica }}</p>
-              </div>
-              <div v-if="empresa.data_inicio_atividade">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Início Atividade
-                </p>
-                <p>{{ formatDateOnly(empresa.data_inicio_atividade) }}</p>
-              </div>
-              <div v-if="empresa.email">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  E-mail
-                </p>
-                <p>{{ empresa.email }}</p>
-              </div>
-              <div v-if="empresa.telefone">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Telefone
-                </p>
-                <p>{{ empresa.telefone }}</p>
-              </div>
-              <div v-if="empresa.logradouro" class="col-span-2 md:col-span-3">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Endereço
-                </p>
-                <p>
-                  {{ empresa.logradouro }}{{ empresa.numero ? `, ${empresa.numero}` : '' }}{{ empresa.complemento ? ` - ${empresa.complemento}` : '' }},
-                  {{ empresa.bairro }} — {{ empresa.cidade }}/{{ empresa.estado }}, CEP {{ empresa.cep }}
-                </p>
-              </div>
-            </div>
-          </template>
+                <USeparator />
 
-          <template #certificado>
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 py-4 text-sm">
-              <div>
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Status
-                </p>
-                <UBadge :color="certColor as any" variant="subtle" size="sm">
-                  {{ certLabel }}
-                </UBadge>
+                <div class="grid grid-cols-2 gap-4">
+                  <div v-if="syncState">
+                    <span class="block text-xs text-muted mb-1">Última sync</span>
+                    <span class="font-medium">{{ formatDate(syncState.ultima_sincronizacao) }}</span>
+                  </div>
+                  <div v-if="syncState">
+                    <span class="block text-xs text-muted mb-1">Período</span>
+                    <span class="font-medium">{{ syncState.lookback_days }} dias</span>
+                  </div>
+                  <div v-if="syncState">
+                    <span class="block text-xs text-muted mb-1">Último NSU</span>
+                    <span class="font-mono text-xs">{{ syncState.ult_nsu || '—' }}</span>
+                  </div>
+                  <div v-if="syncState?.ultimo_cstat">
+                    <span class="block text-xs text-muted mb-1">Último cStat</span>
+                    <UBadge
+                      :color="syncState.ultimo_cstat === '138' ? 'success' : syncState.ultimo_cstat === '656' ? 'error' : 'neutral'"
+                      variant="subtle"
+                      size="sm"
+                    >
+                      {{ syncState.ultimo_cstat }}
+                    </UBadge>
+                  </div>
+                </div>
               </div>
-              <div v-if="empresa.certificado_valido_ate">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Válido até
-                </p>
-                <p>{{ formatDateOnly(empresa.certificado_valido_ate) }}</p>
-              </div>
-              <div v-if="syncState">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Período de busca
-                </p>
-                <p>{{ syncState.lookback_days }} dias</p>
-              </div>
-              <div v-if="syncState">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Último NSU
-                </p>
-                <p class="font-mono text-xs">
-                  {{ syncState.ult_nsu || '—' }}
-                </p>
-              </div>
-              <div v-if="syncState">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Max NSU
-                </p>
-                <p class="font-mono text-xs">
-                  {{ syncState.max_nsu || '—' }}
-                </p>
-              </div>
-              <div v-if="syncState?.ultima_sincronizacao">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Última sync
-                </p>
-                <p>{{ formatDate(syncState.ultima_sincronizacao) }}</p>
-              </div>
-              <div v-if="syncState?.ultimo_cstat">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Último cStat
-                </p>
-                <UBadge
-                  :color="syncState.ultimo_cstat === '138' ? 'success' : syncState.ultimo_cstat === '656' ? 'error' : 'neutral'"
-                  variant="subtle"
-                  size="sm"
-                >
-                  {{ syncState.ultimo_cstat }} — {{ syncState.ultimo_xmotivo || '—' }}
-                </UBadge>
-              </div>
-              <div v-if="isBlocked">
-                <p class="text-xs text-muted uppercase mb-0.5">
-                  Bloqueado até
-                </p>
-                <p class="text-error">
-                  {{ formatDate(blockedUntilDate) }}
-                </p>
-              </div>
-            </div>
-          </template>
+            </UCard>
 
-          <template #documentos>
-            <div class="py-2">
-              <div
-                v-if="recentes.length === 0"
-                class="text-sm text-muted py-4 text-center"
+            <!-- Dados Cadastrais -->
+            <UCard>
+              <template #header>
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-building-2" class="size-5 text-primary" />
+                  <h3 class="font-semibold text-highlighted">
+                    Dados Cadastrais
+                  </h3>
+                </div>
+              </template>
+
+              <div class="space-y-4 text-sm">
+                <div v-if="empresa.nome_fantasia">
+                  <span class="block text-xs text-muted mb-1">Nome Fantasia</span>
+                  <span class="font-medium">{{ empresa.nome_fantasia }}</span>
+                </div>
+                <div v-if="empresa.cnae || empresa.natureza_juridica">
+                  <span class="block text-xs text-muted mb-1">Natureza / CNAE</span>
+                  <span>{{ empresa.natureza_juridica || '—' }} <span v-if="empresa.cnae" class="text-muted">({{ empresa.cnae }})</span></span>
+                </div>
+                <div v-if="empresa.email || empresa.telefone" class="grid grid-cols-2 gap-4">
+                  <div v-if="empresa.email">
+                    <span class="block text-xs text-muted mb-1">E-mail</span>
+                    <span class="truncate">{{ empresa.email }}</span>
+                  </div>
+                  <div v-if="empresa.telefone">
+                    <span class="block text-xs text-muted mb-1">Telefone</span>
+                    <span>{{ empresa.telefone }}</span>
+                  </div>
+                </div>
+                <div v-if="empresa.logradouro || empresa.cidade">
+                  <span class="block text-xs text-muted mb-1">Endereço</span>
+                  <span class="leading-relaxed text-muted">
+                    {{ empresa.logradouro }}{{ empresa.numero ? `, ${empresa.numero}` : '' }}{{ empresa.complemento ? ` - ${empresa.complemento}` : '' }}<br v-if="empresa.logradouro">
+                    <span v-if="empresa.bairro">{{ empresa.bairro }} — </span>{{ empresa.cidade }}<span v-if="empresa.estado">/{{ empresa.estado }}</span>
+                    <span v-if="empresa.cep"> (CEP {{ empresa.cep }})</span>
+                  </span>
+                </div>
+              </div>
+            </UCard>
+          </div>
+
+          <!-- Right Column: Stats and Lists -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Stats Cards -->
+            <UPageGrid class="grid-cols-2 lg:grid-cols-4">
+              <UPageCard
+                v-for="stat in statCards"
+                :key="stat.title"
+                :title="stat.title"
+                :description="String(stat.value)"
+                :icon="stat.icon"
+                variant="soft"
+                :ui="{
+                  wrapper: 'items-start',
+                  title: 'text-xs text-muted uppercase font-medium',
+                  description: 'text-2xl font-bold text-highlighted mt-1',
+                  leadingIcon: `text-${stat.color} size-8`
+                }"
+              />
+            </UPageGrid>
+
+            <!-- Chart -->
+            <UCard v-if="porCompetencia.length > 0">
+              <template #header>
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-bar-chart-3" class="size-5 text-primary" />
+                  <h3 class="font-semibold text-highlighted">
+                    Volume de XMLs por Competência
+                  </h3>
+                </div>
+              </template>
+
+              <VisXYContainer
+                :data="chartData"
+                :padding="{ top: 20, left: 8, right: 8 }"
+                class="h-56"
               >
+                <VisGroupedBar :x="x" :y="[(d: CompetenciaCount) => d.count]" color="['var(--ui-primary)']" />
+                <VisAxis type="x" :x="x" :tick-format="xTicks" />
+                <VisCrosshair color="var(--ui-primary)" :template="template" />
+                <VisTooltip />
+              </VisXYContainer>
+            </UCard>
+
+            <!-- Documentos Recentes Table -->
+            <UCard :ui="{ body: 'p-0 sm:p-0', header: 'px-4 py-3 sm:px-6' }">
+              <template #header>
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2">
+                    <UIcon name="i-lucide-files" class="size-5 text-primary" />
+                    <h3 class="font-semibold text-highlighted">
+                      Documentos Recentes
+                    </h3>
+                  </div>
+                  <UButton
+                    to="/documentos"
+                    color="neutral"
+                    variant="ghost"
+                    size="xs"
+                    label="Ver todos"
+                    icon="i-lucide-arrow-right"
+                    trailing
+                  />
+                </div>
+              </template>
+
+              <UTable
+                v-if="recentes.length > 0"
+                :data="recentes"
+                :columns="tableColumns"
+                class="w-full"
+              />
+              <div v-else class="text-sm text-muted py-8 text-center">
                 Nenhum documento encontrado.
               </div>
-              <table v-else class="w-full text-sm">
-                <thead>
-                  <tr class="text-xs text-muted uppercase border-b border-default">
-                    <th class="text-left py-2 pr-4 font-normal">
-                      Emitente
-                    </th>
-                    <th class="text-left py-2 pr-4 font-normal">
-                      Número
-                    </th>
-                    <th class="text-left py-2 pr-4 font-normal">
-                      Tipo
-                    </th>
-                    <th class="text-left py-2 pr-4 font-normal">
-                      Status
-                    </th>
-                    <th class="text-left py-2 pr-4 font-normal">
-                      Competência
-                    </th>
-                    <th class="text-left py-2 font-normal">
-                      XML
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="doc in recentes"
-                    :key="doc.id"
-                    class="border-b border-default last:border-0"
-                  >
-                    <td class="py-2 pr-4 max-w-48 truncate">
-                      <p class="truncate font-medium text-highlighted">
-                        {{ doc.emitente_nome || '—' }}
-                      </p>
-                      <p class="text-xs text-muted">
-                        {{ doc.emitente_cnpj || '' }}
-                      </p>
-                    </td>
-                    <td class="py-2 pr-4 text-muted">
-                      {{ doc.numero_documento || '—' }}
-                    </td>
-                    <td class="py-2 pr-4">
-                      <UBadge :color="tipoColor(doc.tipo_documento)" variant="subtle" size="xs">
-                        {{ doc.tipo_documento.toUpperCase() }}
-                      </UBadge>
-                    </td>
-                    <td class="py-2 pr-4">
-                      <UBadge :color="statusColor(doc.status_documento)" variant="subtle" size="xs">
-                        {{ doc.status_documento }}
-                      </UBadge>
-                    </td>
-                    <td class="py-2 pr-4 text-muted">
-                      {{ doc.competencia || '—' }}
-                    </td>
-                    <td class="py-2">
-                      <UBadge :color="doc.xml_resumo ? 'warning' : 'success'" variant="subtle" size="xs">
-                        {{ doc.xml_resumo ? 'Resumo' : 'Completo' }}
-                      </UBadge>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </template>
-        </UAccordion>
+            </UCard>
+          </div>
+        </div>
       </template>
     </template>
   </UDashboardPanel>
