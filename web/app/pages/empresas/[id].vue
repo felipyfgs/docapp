@@ -477,6 +477,13 @@ const tableColumns: TableColumn<DocumentoFiscal>[] = [
         <span v-else class="text-xs text-dimmed">XML ou ZIP · máx 200 MB</span>
       </button>
 
+      <div v-if="importing" class="space-y-1.5 pt-1">
+        <UProgress animation="carousel" />
+        <p class="text-xs text-muted text-center">
+          Importando...
+        </p>
+      </div>
+
       <div v-if="importResult" class="mt-4 rounded-lg p-3 text-sm" :class="importResult.failed > 0 ? 'bg-warning/10' : 'bg-success/10'">
         <p class="font-medium text-highlighted">
           {{ importResult.imported }} documento{{ importResult.imported !== 1 ? 's' : '' }} importado{{ importResult.imported !== 1 ? 's' : '' }}

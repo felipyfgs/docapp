@@ -59,6 +59,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const selectedUnknownEmpresas = ref<string[]>([])
 const registeringEmpresas = ref(false)
+const registerProgress = ref(0)
 
 const importFileLabel = computed(() => {
   if (importFiles.value.length === 0) return 'Clique para selecionar arquivos'
@@ -99,11 +100,13 @@ function closeImport() {
   importFiles.value = []
   importResult.value = null
   selectedUnknownEmpresas.value = []
+  registerProgress.value = 0
 }
 
 async function registerSelectedEmpresas() {
   if (selectedUnknownEmpresas.value.length === 0) return
   registeringEmpresas.value = true
+  registerProgress.value = 0
 
   try {
     const empresasToRegister = importResult.value?.unknown_empresas?.filter(
@@ -132,6 +135,7 @@ async function registerSelectedEmpresas() {
       } catch (err) {
         console.error('Failed to create empresa:', emp.cnpj, err)
       }
+      registerProgress.value++
     }
 
     if (successCount > 0) {
@@ -426,6 +430,13 @@ function downloadBlob(blob: Blob, fileName: string) {
           <span class="text-xs text-dimmed">XML ou ZIP · múltiplos arquivos · máx 200 MB total</span>
         </button>
 
+        <div v-if="importing" class="space-y-1.5 pt-1">
+          <UProgress animation="carousel" />
+          <p class="text-xs text-muted text-center">
+            Processando {{ importFiles.length }} arquivo(s)...
+          </p>
+        </div>
+
         <div v-if="importResult" class="space-y-2">
           <div
             v-for="(r, empresa) in importResult.by_empresa"
@@ -478,13 +489,22 @@ function downloadBlob(blob: Blob, fileName: string) {
                 </label>
               </div>
             </div>
+            <div v-if="registeringEmpresas" class="mt-3 space-y-1.5">
+              <UProgress
+                :model-value="registerProgress"
+                :max="selectedUnknownEmpresas.length"
+                status
+              />
+              <p class="text-xs text-muted text-center">
+                Cadastrando empresa {{ registerProgress + 1 }} de {{ selectedUnknownEmpresas.length }}...
+              </p>
+            </div>
             <UButton
-              v-if="selectedUnknownEmpresas.length > 0"
+              v-else-if="selectedUnknownEmpresas.length > 0"
               class="mt-3 w-full"
               label="Cadastrar Selecionadas e Re-importar"
               color="primary"
               variant="outline"
-              :loading="registeringEmpresas"
               @click="registerSelectedEmpresas"
             />
           </div>
