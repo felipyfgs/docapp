@@ -453,9 +453,28 @@ function getVisibilityItems() {
   />
 
   <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-    <div class="text-sm text-muted">
-      {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} de
-      {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} linha(s) selecionada(s).
+    <div class="flex items-center gap-3 text-sm text-muted">
+      <span>
+        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} de
+        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} linha(s) selecionada(s).
+      </span>
+
+      <div class="flex items-center gap-1.5">
+        <span>Linhas</span>
+        <USelect
+          :model-value="String(pagination.pageSize)"
+          :items="[
+            { label: '10', value: '10' },
+            { label: '15', value: '15' },
+            { label: '25', value: '25' },
+            { label: '50', value: '50' },
+            { label: '100', value: '100' },
+            { label: '200', value: '200' }
+          ]"
+          class="w-20"
+          @update:model-value="(val: string) => { pagination.pageSize = Number(val); pagination.pageIndex = 0 }"
+        />
+      </div>
     </div>
 
     <UPagination
