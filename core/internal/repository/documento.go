@@ -307,15 +307,15 @@ func (r *DocumentoRepository) ListDocsBloqueadosSemXML(ctx context.Context, empr
 }
 
 type DocumentoStats struct {
-	Total        int `bun:"total"`
-	XMLCompleto  int `bun:"xml_completo"`
-	XMLResumo    int `bun:"xml_resumo"`
-	Manifestados int `bun:"manifestados"`
+	Total        int `bun:"total" json:"total"`
+	XMLCompleto  int `bun:"xml_completo" json:"xml_completo"`
+	XMLResumo    int `bun:"xml_resumo" json:"xml_resumo"`
+	Manifestados int `bun:"manifestados" json:"manifestados"`
 }
 
 type CompetenciaCount struct {
-	Competencia string `bun:"competencia"`
-	Count       int    `bun:"count"`
+	Competencia string `bun:"competencia" json:"competencia"`
+	Count       int    `bun:"count" json:"count"`
 }
 
 func (r *DocumentoRepository) StatsEmpresa(ctx context.Context, empresaID uint) (*DocumentoStats, error) {
