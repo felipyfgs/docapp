@@ -4,6 +4,7 @@ import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import { upperFirst } from 'scule'
 import type { DocumentoFiscal } from '~/types'
+import type { ColumnConfig } from '~/composables/useTableFilter'
 
 const props = defineProps<{
   data: DocumentoFiscal[] | null | undefined
@@ -33,18 +34,82 @@ const columnVisibility = ref<Record<string, boolean>>({
 const rowSelection = ref<Record<string, boolean>>({})
 
 const pagination = ref({ pageIndex: 0, pageSize: 15 })
-const showFilters = ref(false)
 
 const search = defineModel<string>('search', { default: '' })
-const tipoFilter = defineModel<string>('tipoFilter', { default: 'all' })
-const statusFilter = defineModel<string>('statusFilter', { default: 'all' })
-const resumoFilter = defineModel<string>('resumoFilter', { default: 'all' })
-const competenciaFilter = defineModel<string>('competenciaFilter', { default: 'all' })
-const manifestacaoFilter = defineModel<string>('manifestacaoFilter', { default: 'all' })
+
+const competenciaOptions = computed(() => {
+  const all = [...new Set((props.data ?? []).map(d => d.competencia).filter(Boolean))]
+  return all.sort().reverse().map(c => ({ label: c!, value: c! }))
+})
+
+const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
+  {
+    id: 'tipo_documento',
+    accessor: row => row.tipo_documento,
+    displayName: 'Tipo',
+    icon: 'i-lucide-file-text',
+    type: 'option',
+    options: [
+      { label: 'NF-e', value: 'nf-e' },
+      { label: 'NFC-e', value: 'nfc-e' },
+      { label: 'CT-e', value: 'ct-e' },
+      { label: 'NFS-e', value: 'nfs-e' },
+      { label: 'Desconhecido', value: 'desconhecido' }
+    ]
+  },
+  {
+    id: 'status_documento',
+    accessor: row => row.status_documento,
+    displayName: 'Status',
+    icon: 'i-lucide-circle-check',
+    type: 'option',
+    options: [
+      { label: 'Autorizada', value: 'autorizada' },
+      { label: 'Cancelada', value: 'cancelada' },
+      { label: 'Denegada', value: 'denegada' },
+      { label: 'Desconhecido', value: 'desconhecido' }
+    ]
+  },
+  {
+    id: 'xml_resumo',
+    accessor: row => row.xml_resumo ? 'resumo' : 'completo',
+    displayName: 'XML',
+    icon: 'i-lucide-file-code',
+    type: 'option',
+    options: [
+      { label: 'Completo', value: 'completo' },
+      { label: 'Resumo', value: 'resumo' }
+    ]
+  },
+  {
+    id: 'competencia',
+    accessor: row => row.competencia ?? null,
+    displayName: 'Competência',
+    icon: 'i-lucide-calendar',
+    type: 'option',
+    options: competenciaOptions
+  },
+  {
+    id: 'manifestacao_status',
+    accessor: row => row.manifestacao_status ?? 'pendente',
+    displayName: 'Manifestação',
+    icon: 'i-lucide-stamp',
+    type: 'option',
+    options: [
+      { label: 'Pendente', value: 'pendente' },
+      { label: 'Ciência', value: 'ciencia' },
+      { label: 'Confirmada', value: 'confirmada' },
+      { label: 'Desconhecida', value: 'desconhecida' },
+      { label: 'Não Realizada', value: 'nao_realizada' }
+    ]
+  }
+]
+
+const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
 const filtered = computed(() => {
   const query = search.value.toLowerCase().trim()
-  let result = props.data ?? []
+  let result = filteredData.value
 
   if (query) {
     result = result.filter((documento) => {
@@ -56,60 +121,12 @@ const filtered = computed(() => {
         documento.emitente_cnpj,
         documento.destinatario_cnpj
       ]
-
       return values.some(value => value?.toLowerCase().includes(query))
     })
   }
 
-  if (tipoFilter.value !== 'all') {
-    result = result.filter(documento => documento.tipo_documento === tipoFilter.value)
-  }
-
-  if (statusFilter.value !== 'all') {
-    result = result.filter(documento => documento.status_documento === statusFilter.value)
-  }
-
-  if (resumoFilter.value === 'resumo') {
-    result = result.filter(documento => documento.xml_resumo)
-  }
-
-  if (resumoFilter.value === 'completo') {
-    result = result.filter(documento => !documento.xml_resumo)
-  }
-
-  if (competenciaFilter.value !== 'all') {
-    result = result.filter(documento => documento.competencia === competenciaFilter.value)
-  }
-
-  if (manifestacaoFilter.value === 'pendente') {
-    result = result.filter(documento => !documento.manifestacao_status)
-  } else if (manifestacaoFilter.value !== 'all') {
-    result = result.filter(documento => documento.manifestacao_status === manifestacaoFilter.value)
-  }
-
   return result
 })
-
-const competenciaOptions = computed(() => {
-  const all = [...new Set((props.data ?? []).map(d => d.competencia).filter(Boolean))]
-  return all.sort().reverse().map(c => ({ label: c, value: c }))
-})
-
-const activeFilterCount = computed(() => [
-  tipoFilter.value !== 'all',
-  statusFilter.value !== 'all',
-  resumoFilter.value !== 'all',
-  competenciaFilter.value !== 'all',
-  manifestacaoFilter.value !== 'all'
-].filter(Boolean).length)
-
-function clearFilters() {
-  tipoFilter.value = 'all'
-  statusFilter.value = 'all'
-  resumoFilter.value = 'all'
-  competenciaFilter.value = 'all'
-  manifestacaoFilter.value = 'all'
-}
 
 const selectedRows = computed((): DocumentoFiscal[] => {
   if (!table.value?.tableApi) return []
@@ -395,15 +412,6 @@ function getVisibilityItems() {
     <div class="flex items-center gap-2 ml-auto">
       <slot name="actions" :selected-rows="selectedRows" />
 
-      <UButton
-        color="neutral"
-        variant="outline"
-        icon="i-lucide-sliders-horizontal"
-        :label="activeFilterCount > 0 ? `Filtros (${activeFilterCount})` : 'Filtros'"
-        :class="activeFilterCount > 0 ? 'text-primary' : ''"
-        @click="showFilters = !showFilters"
-      />
-
       <UDropdownMenu
         :items="getVisibilityItems()"
         :content="{ align: 'end' }"
@@ -418,77 +426,12 @@ function getVisibilityItems() {
     </div>
   </div>
 
-  <!-- Row 2: filters (collapsible) -->
-  <div v-if="showFilters" class="flex flex-wrap items-center gap-2 pt-1">
-    <USelect
-      v-model="tipoFilter"
-      :items="[
-        { label: 'Todos os tipos', value: 'all' },
-        { label: 'NF-e', value: 'nf-e' },
-        { label: 'NFC-e', value: 'nfc-e' },
-        { label: 'CT-e', value: 'ct-e' },
-        { label: 'NFS-e', value: 'nfs-e' },
-        { label: 'Desconhecido', value: 'desconhecido' }
-      ]"
-      placeholder="Tipo"
-      class="w-36"
-    />
-
-    <USelect
-      v-model="statusFilter"
-      :items="[
-        { label: 'Todos os status', value: 'all' },
-        { label: 'Autorizada', value: 'autorizada' },
-        { label: 'Cancelada', value: 'cancelada' },
-        { label: 'Denegada', value: 'denegada' },
-        { label: 'Desconhecido', value: 'desconhecido' }
-      ]"
-      placeholder="Status"
-      class="w-36"
-    />
-
-    <USelect
-      v-model="resumoFilter"
-      :items="[
-        { label: 'Completo e resumo', value: 'all' },
-        { label: 'Apenas completo', value: 'completo' },
-        { label: 'Apenas resumo', value: 'resumo' }
-      ]"
-      placeholder="XML"
-      class="w-40"
-    />
-
-    <USelect
-      v-model="competenciaFilter"
-      :items="[{ label: 'Todas as competências', value: 'all' }, ...competenciaOptions]"
-      placeholder="Competência"
-      class="w-44"
-    />
-
-    <USelect
-      v-model="manifestacaoFilter"
-      :items="[
-        { label: 'Todas as manifestações', value: 'all' },
-        { label: 'Ciência', value: 'ciencia' },
-        { label: 'Confirmada', value: 'confirmada' },
-        { label: 'Desconhecida', value: 'desconhecida' },
-        { label: 'Não Realizada', value: 'nao_realizada' },
-        { label: 'Pendente', value: 'pendente' }
-      ]"
-      placeholder="Manifestação"
-      class="w-44"
-    />
-
-    <UButton
-      v-if="activeFilterCount > 0"
-      color="neutral"
-      variant="ghost"
-      icon="i-lucide-x"
-      label="Limpar"
-      size="sm"
-      @click="clearFilters"
-    />
-  </div>
+  <!-- Row 2: Linear-style filter chips -->
+  <DataTableFilter
+    :columns="filterColumns"
+    :filters="filters"
+    :actions="filterActions"
+  />
 
   <UTable
     ref="table"
