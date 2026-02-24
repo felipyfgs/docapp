@@ -397,13 +397,19 @@ function getVisibilityItems() {
 </script>
 
 <template>
-  <!-- Row 1: search + actions + column visibility -->
+  <!-- Toolbar: search + filter + chips + actions + columns -->
   <div class="flex flex-wrap items-center gap-2">
     <UInput
       v-model="search"
       icon="i-lucide-search"
       placeholder="Emitente, destinatário, chave, número..."
-      class="flex-1 min-w-52"
+      class="w-64"
+    />
+
+    <DocumentosDataTableFilter
+      :columns="filterColumns"
+      :filters="filters"
+      :actions="filterActions"
     />
 
     <div class="flex items-center gap-2 ml-auto">
@@ -422,13 +428,6 @@ function getVisibilityItems() {
       </UDropdownMenu>
     </div>
   </div>
-
-  <!-- Row 2: Linear-style filter chips -->
-  <DocumentosDataTableFilter
-    :columns="filterColumns"
-    :filters="filters"
-    :actions="filterActions"
-  />
 
   <UTable
     ref="table"
