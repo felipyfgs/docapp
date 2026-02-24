@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -124,15 +125,24 @@ func (r *DocumentoRepository) UpsertMany(ctx context.Context, docs []model.Docum
 		docs[i].UpdatedAt = now
 	}
 
-	// Split: docs com chave_acesso usam constraint chave (pode ter NSU diferente entre batches)
-	// docs sem chave usam constraint NSU
-	var comChave, semChave []model.DocumentoFiscal
+	// Deduplicate within batch to avoid "ON CONFLICT DO UPDATE command cannot affect row a second time".
+	// Last occurrence wins (same as ON CONFLICT DO UPDATE semantics).
+	seenChave := make(map[string]model.DocumentoFiscal)
+	seenNSU := make(map[string]model.DocumentoFiscal)
 	for _, d := range docs {
 		if d.ChaveAcesso != "" {
-			comChave = append(comChave, d)
-		} else {
-			semChave = append(semChave, d)
+			seenChave[fmt.Sprintf("%d:%s", d.EmpresaID, d.ChaveAcesso)] = d
+		} else if d.NSU != "" {
+			seenNSU[fmt.Sprintf("%d:%s", d.EmpresaID, d.NSU)] = d
 		}
+	}
+
+	var comChave, semChave []model.DocumentoFiscal
+	for _, d := range seenChave {
+		comChave = append(comChave, d)
+	}
+	for _, d := range seenNSU {
+		semChave = append(semChave, d)
 	}
 
 	commonSetsNoChave := func(q *bun.InsertQuery) *bun.InsertQuery {
