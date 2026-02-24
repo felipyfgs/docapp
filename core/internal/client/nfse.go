@@ -18,18 +18,22 @@ type NFSeClient struct {
 }
 
 type NFSeDistResponse struct {
-	UltNSU    string        `json:"ultNSU"`
-	MaxNSU    string        `json:"maxNSU"`
-	CStat     string        `json:"cStat"`
-	XMotivo   string        `json:"xMotivo"`
-	Documentos []NFSeDocDFe `json:"loteDistDFeInt"`
+	StatusProcessamento string       `json:"StatusProcessamento"`
+	LoteDFe             []NFSeDocDFe `json:"LoteDFe"`
+	// Compat fields for logging
+	CStat   string `json:"-"`
+	XMotivo string `json:"-"`
+}
+
+func (r *NFSeDistResponse) HasDocuments() bool {
+	return r.StatusProcessamento == "DOCUMENTOS_LOCALIZADOS" && len(r.LoteDFe) > 0
 }
 
 type NFSeDocDFe struct {
-	NSU        string `json:"NSU"`
-	Schema     string `json:"schema"`
-	XMLBase64  string `json:"docZip"`
-	ChNFSe     string `json:"chNFSe"`
+	NSU            int    `json:"NSU"`
+	ChaveAcesso    string `json:"ChaveAcesso"`
+	TipoDocumento  string `json:"TipoDocumento"`
+	ArquivoXml     string `json:"ArquivoXml"`
 }
 
 type NFSeConsultaResponse struct {

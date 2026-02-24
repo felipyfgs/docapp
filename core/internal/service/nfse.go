@@ -1,10 +1,15 @@
 package service
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"io"
+	"strconv"
 	"strings"
 	"time"
 
@@ -88,39 +93,44 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 
 		s.log.Debug().
 			Int("iteration", iteration).
-			Str("cstat", resp.CStat).
-			Str("ult_nsu", resp.UltNSU).
-			Str("max_nsu", resp.MaxNSU).
-			Int("docs", len(resp.Documentos)).
+			Str("status", resp.StatusProcessamento).
+			Int("docs", len(resp.LoteDFe)).
 			Msg("nfse adn response")
 
-		if resp.CStat == "" && resp.UltNSU == "" && len(resp.Documentos) == 0 {
-			bodyPreview := rawBody
-			if len(bodyPreview) > 500 {
-				bodyPreview = bodyPreview[:500] + "..."
+		if !resp.HasDocuments() {
+			if resp.StatusProcessamento == "" && len(resp.LoteDFe) == 0 {
+				bodyPreview := rawBody
+				if len(bodyPreview) > 500 {
+					bodyPreview = bodyPreview[:500] + "..."
+				}
+				s.log.Warn().
+					Str("cnpj", empresa.CNPJ).
+					Str("raw_body", bodyPreview).
+					Msg("nfse: ADN returned empty/unexpected response")
 			}
-			s.log.Warn().
-				Str("cnpj", empresa.CNPJ).
-				Str("raw_body", bodyPreview).
-				Msg("nfse: ADN returned empty/unexpected response")
 			break
 		}
 
-		if resp.CStat == "137" || len(resp.Documentos) == 0 {
-			break
-		}
+		var maxNSU int
+		docs := make([]model.DocumentoFiscal, 0, len(resp.LoteDFe))
+		for _, d := range resp.LoteDFe {
+			if d.NSU > maxNSU {
+				maxNSU = d.NSU
+			}
 
-		docs := make([]model.DocumentoFiscal, 0, len(resp.Documentos))
-		for _, d := range resp.Documentos {
-			xmlContent := d.XMLBase64
+			xmlContent, err := decompressGzipBase64(d.ArquivoXml)
+			if err != nil {
+				s.log.Warn().Err(err).Int("nsu", d.NSU).Msg("nfse: failed to decompress xml")
+				continue
+			}
 			if xmlContent == "" {
 				continue
 			}
 
 			parsed := ParseNFSeXML(xmlContent)
 
-			chave := firstNonEmpty(parsed.ChaveAcesso, d.ChNFSe)
-			nsu := d.NSU
+			chave := firstNonEmpty(parsed.ChaveAcesso, d.ChaveAcesso)
+			nsu := strconv.Itoa(d.NSU)
 			baseName := firstNonEmpty(chave, nsu)
 			if baseName == "" {
 				baseName = fmt.Sprintf("nfse_%d", time.Now().UnixNano())
@@ -146,7 +156,7 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 				DestinatarioNome: parsed.TomadorNome,
 				DestinatarioCNPJ: parsed.TomadorCNPJ,
 				Competencia:      parsed.Competencia,
-				Schema:           d.Schema,
+				Schema:           d.TipoDocumento,
 				XMLObjectKey:     objectKey,
 				XMLSHA256:        hex.EncodeToString(xmlHash[:]),
 				XMLSizeBytes:     len(xmlContent),
@@ -169,17 +179,13 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 			totalDocs += len(docs)
 		}
 
-		if resp.UltNSU != "" {
-			currentNSU = resp.UltNSU
+		if maxNSU > 0 {
+			currentNSU = strconv.Itoa(maxNSU)
 		}
 
 		_ = s.empresaRepo.UpdateSyncState(ctx, empresa.ID, repository.SyncStatePatch{
 			UltNSUNFSe: &currentNSU,
 		})
-
-		if resp.UltNSU == resp.MaxNSU || resp.UltNSU == "" {
-			break
-		}
 
 		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
 	}
@@ -197,4 +203,28 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 		Msg("nfse: sync completed")
 
 	return nil
+}
+
+func decompressGzipBase64(data string) (string, error) {
+	if data == "" {
+		return "", nil
+	}
+
+	compressed, err := base64.StdEncoding.DecodeString(data)
+	if err != nil {
+		return data, nil
+	}
+
+	reader, err := gzip.NewReader(bytes.NewReader(compressed))
+	if err != nil {
+		return data, nil
+	}
+	defer reader.Close()
+
+	decompressed, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("reading gzip data: %w", err)
+	}
+
+	return string(decompressed), nil
 }
