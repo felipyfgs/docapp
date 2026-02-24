@@ -20,6 +20,7 @@ type Config struct {
 	StorageUseSSL         bool
 	StorageRegion         string
 	StoragePresignMinutes int
+	ADNBaseURL            string
 }
 
 func Load() *Config {
@@ -38,6 +39,7 @@ func Load() *Config {
 		StorageUseSSL:         getEnvBool("STORAGE_USE_SSL", false),
 		StorageRegion:         getEnv("STORAGE_REGION", "us-east-1"),
 		StoragePresignMinutes: getEnvInt("STORAGE_PRESIGN_MINUTES", 15),
+		ADNBaseURL:            getEnv("ADN_BASE_URL", "https://adn.nfse.gov.br/contribuintes"),
 	}
 }
 

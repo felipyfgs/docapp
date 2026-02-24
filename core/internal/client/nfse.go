@@ -20,9 +20,6 @@ type NFSeClient struct {
 type NFSeDistResponse struct {
 	StatusProcessamento string       `json:"StatusProcessamento"`
 	LoteDFe             []NFSeDocDFe `json:"LoteDFe"`
-	// Compat fields for logging
-	CStat   string `json:"-"`
-	XMotivo string `json:"-"`
 }
 
 func (r *NFSeDistResponse) HasDocuments() bool {
@@ -36,25 +33,7 @@ type NFSeDocDFe struct {
 	ArquivoXml     string `json:"ArquivoXml"`
 }
 
-type NFSeConsultaResponse struct {
-	XML     string `json:"xml"`
-	CStat   string `json:"cStat"`
-	XMotivo string `json:"xMotivo"`
-}
 
-type NFSeEventosResponse struct {
-	Eventos []NFSeEvento `json:"eventos"`
-	CStat   string       `json:"cStat"`
-	XMotivo string       `json:"xMotivo"`
-}
-
-type NFSeEvento struct {
-	TpEvento    string `json:"tpEvento"`
-	NSU         string `json:"NSU"`
-	ChNFSe      string `json:"chNFSe"`
-	DHEvento    string `json:"dhEvento"`
-	XMLBase64   string `json:"docZip"`
-}
 
 func NewNFSeClient(baseURL string, pfxData []byte, senha string) (*NFSeClient, error) {
 	privateKey, certificate, caCerts, err := pkcs12.DecodeChain(pfxData, senha)
@@ -100,7 +79,7 @@ func (c *NFSeClient) DistDFe(ctx context.Context, ultNSU string) (*NFSeDistRespo
 	rawBody := string(body)
 
 	if status == 404 {
-		return &NFSeDistResponse{CStat: "137", XMotivo: "Nenhum documento localizado"}, rawBody, nil
+		return &NFSeDistResponse{StatusProcessamento: "NENHUM_DOCUMENTO_LOCALIZADO"}, rawBody, nil
 	}
 
 	if status >= 400 {
@@ -108,7 +87,7 @@ func (c *NFSeClient) DistDFe(ctx context.Context, ultNSU string) (*NFSeDistRespo
 	}
 
 	if len(body) == 0 {
-		return &NFSeDistResponse{CStat: "137", XMotivo: "Resposta vazia do ADN"}, "", nil
+		return &NFSeDistResponse{StatusProcessamento: "NENHUM_DOCUMENTO_LOCALIZADO"}, "", nil
 	}
 
 	var resp NFSeDistResponse
@@ -124,46 +103,6 @@ func truncateBody(s string, max int) string {
 		return s
 	}
 	return s[:max] + "..."
-}
-
-func (c *NFSeClient) ConsultaNFSe(ctx context.Context, chaveAcesso string) (*NFSeConsultaResponse, error) {
-	url := fmt.Sprintf("%s/NFSe/%s", c.baseURL, chaveAcesso)
-
-	status, body, err := c.get(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-
-	if status >= 400 {
-		return nil, fmt.Errorf("ADN consulta error: status %d", status)
-	}
-
-	var resp NFSeConsultaResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("parsing consulta response: %w", err)
-	}
-
-	return &resp, nil
-}
-
-func (c *NFSeClient) Eventos(ctx context.Context, chaveAcesso string) (*NFSeEventosResponse, error) {
-	url := fmt.Sprintf("%s/NFSe/%s/Eventos", c.baseURL, chaveAcesso)
-
-	status, body, err := c.get(ctx, url)
-	if err != nil {
-		return nil, err
-	}
-
-	if status >= 400 {
-		return nil, fmt.Errorf("ADN eventos error: status %d", status)
-	}
-
-	var resp NFSeEventosResponse
-	if err := json.Unmarshal(body, &resp); err != nil {
-		return nil, fmt.Errorf("parsing eventos response: %w", err)
-	}
-
-	return &resp, nil
 }
 
 func (c *NFSeClient) get(ctx context.Context, url string) (int, []byte, error) {

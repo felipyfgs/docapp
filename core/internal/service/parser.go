@@ -331,7 +331,7 @@ func extractCompetencia(dataEmissao *time.Time) string {
 	if dataEmissao == nil {
 		return ""
 	}
-	return dataEmissao.Format("2006/01")
+	return dataEmissao.Format("2006-01")
 }
 
 func isResumoDocument(schema string) bool {

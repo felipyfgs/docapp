@@ -20,16 +20,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-const (
-	nfseMaxSyncLoops = 10
-	nfseADNBaseURL   = "https://adn.nfse.gov.br/contribuintes"
-)
+const nfseMaxSyncLoops = 10
 
 type NFSeSyncService struct {
 	empresaRepo   *repository.EmpresaRepository
 	documentoRepo *repository.DocumentoRepository
 	storage       DocumentStorage
 	log           zerolog.Logger
+	adnBaseURL    string
 }
 
 func NewNFSeSyncService(
@@ -37,12 +35,14 @@ func NewNFSeSyncService(
 	documentoRepo *repository.DocumentoRepository,
 	storage DocumentStorage,
 	log zerolog.Logger,
+	adnBaseURL string,
 ) *NFSeSyncService {
 	return &NFSeSyncService{
 		empresaRepo:   empresaRepo,
 		documentoRepo: documentoRepo,
 		storage:       storage,
 		log:           log,
+		adnBaseURL:    adnBaseURL,
 	}
 }
 
@@ -73,7 +73,7 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 		}
 	}
 
-	nfseClient, err := client.NewNFSeClient(nfseADNBaseURL, empresa.CertificadoPFX, empresa.CertificadoSenha)
+	nfseClient, err := client.NewNFSeClient(s.adnBaseURL, empresa.CertificadoPFX, empresa.CertificadoSenha)
 	if err != nil {
 		return fmt.Errorf("creating nfse client: %w", err)
 	}

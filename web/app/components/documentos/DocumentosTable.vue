@@ -16,29 +16,13 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { formatBRL, formatCNPJ, tipoBadge, statusBadge, manifestacaoBadge } = useDocumentoFormatters()
+const { sortableHeader } = useTableHelpers()
 
 const UBadge = resolveComponent('UBadge')
 const UTooltip = resolveComponent('UTooltip')
 const UButton = resolveComponent('UButton')
 const UCheckbox = resolveComponent('UCheckbox')
-
-function sortableHeader(label: string) {
-  return ({ column }: { column: Column<DocumentoFiscal> }) => {
-    const isSorted = column.getIsSorted()
-    return h(UButton, {
-      color: 'neutral',
-      variant: 'ghost',
-      label,
-      icon: isSorted
-        ? isSorted === 'asc'
-          ? 'i-lucide-arrow-up-narrow-wide'
-          : 'i-lucide-arrow-down-wide-narrow'
-        : 'i-lucide-arrow-up-down',
-      class: '-mx-2.5',
-      onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-    })
-  }
-}
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 
 const table = useTemplateRef<{ tableApi: Table<DocumentoFiscal> }>('table')
@@ -203,56 +187,6 @@ function rowItems(row: Row<DocumentoFiscal>) {
       }
     ]
   ]
-}
-
-function formatBRL(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
-function formatCNPJ(cnpj: string | undefined): string {
-  const digits = (cnpj || '').replace(/\D/g, '')
-  if (digits.length === 11) {
-    return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`
-  }
-  if (digits.length === 14) {
-    return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
-  }
-  return cnpj || '—'
-}
-
-function tipoBadge(documento: DocumentoFiscal): { label: string, color: 'primary' | 'success' | 'warning' | 'neutral' } {
-  const map = {
-    'nf-e': { label: 'NF-e', color: 'primary' },
-    'nfc-e': { label: 'NFC-e', color: 'success' },
-    'ct-e': { label: 'CT-e', color: 'warning' },
-    'nfs-e': { label: 'NFS-e', color: 'neutral' },
-    'desconhecido': { label: 'Desconhecido', color: 'neutral' }
-  } as const
-
-  return map[documento.tipo_documento as keyof typeof map] ?? map.desconhecido
-}
-
-function manifestacaoBadge(status: string | undefined): { label: string, color: 'success' | 'info' | 'error' | 'warning' | 'neutral' } {
-  const map = {
-    ciencia: { label: 'Ciência', color: 'info' },
-    confirmada: { label: 'Confirmada', color: 'success' },
-    desconhecida: { label: 'Desconhecida', color: 'error' },
-    nao_realizada: { label: 'Não Realizada', color: 'warning' }
-  } as const
-
-  if (!status) return { label: 'Pendente', color: 'neutral' }
-  return map[status as keyof typeof map] ?? { label: status, color: 'neutral' }
-}
-
-function statusBadge(documento: DocumentoFiscal): { label: string, color: 'success' | 'error' | 'warning' | 'neutral' } {
-  const map = {
-    autorizada: { label: 'Autorizada', color: 'success' },
-    cancelada: { label: 'Cancelada', color: 'error' },
-    denegada: { label: 'Denegada', color: 'warning' },
-    desconhecido: { label: 'Desconhecido', color: 'neutral' }
-  } as const
-
-  return map[documento.status_documento as keyof typeof map] ?? map.desconhecido
 }
 
 const columns: TableColumn<DocumentoFiscal>[] = [

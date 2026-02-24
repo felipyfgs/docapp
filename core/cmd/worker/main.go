@@ -44,7 +44,7 @@ func main() {
 	documentoRepo := repository.NewDocumentoRepository(bunDB)
 	empresaService := service.NewEmpresaService(empresaRepo)
 	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
-	nfseSyncService := service.NewNFSeSyncService(empresaRepo, documentoRepo, storage, log)
+	nfseSyncService := service.NewNFSeSyncService(empresaRepo, documentoRepo, storage, log, cfg.ADNBaseURL)
 
 	interval := time.Duration(cfg.WorkerIntervalMinutes) * time.Minute
 	log.Info().Dur("interval", interval).Str("sped_url", cfg.SpedServiceURL).Msg("worker starting")
