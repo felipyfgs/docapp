@@ -2,7 +2,8 @@
 import type { ColumnConfig, FilterModel, DataTableFilterActions } from '~/composables/useTableFilter'
 
 const props = defineProps<{
-  columns: ColumnConfig<unknown>[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  columns: ColumnConfig<any>[]
   filters: FilterModel[]
   actions: DataTableFilterActions
 }>()
@@ -33,7 +34,8 @@ const quickSearchResults = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (q.length < 2) return []
 
-  const results: Array<{ column: ColumnConfig<unknown>, option: { label: string, value: string } }> = []
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const results: Array<{ column: ColumnConfig<any>, option: { label: string, value: string } }> = []
 
   for (const col of props.columns) {
     if (col.type !== 'option') continue
@@ -106,7 +108,7 @@ watch(selectedFilter, (filter) => {
             <span>{{ selectedColumn.displayName }}</span>
           </button>
         </div>
-        <FilterValuePicker
+        <DocumentosFilterValuePicker
           :filter="selectedFilter"
           :column="selectedColumn"
           :actions="actions"

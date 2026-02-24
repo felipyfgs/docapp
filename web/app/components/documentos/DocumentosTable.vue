@@ -427,7 +427,7 @@ function getVisibilityItems() {
   </div>
 
   <!-- Row 2: Linear-style filter chips -->
-  <DataTableFilter
+  <DocumentosDataTableFilter
     :columns="filterColumns"
     :filters="filters"
     :actions="filterActions"

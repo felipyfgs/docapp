@@ -2,7 +2,8 @@
 import type { ColumnConfig, FilterModel, DataTableFilterActions } from '~/composables/useTableFilter'
 
 defineProps<{
-  columns: ColumnConfig<unknown>[]
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  columns: ColumnConfig<any>[]
   filters: FilterModel[]
   actions: DataTableFilterActions
 }>()
@@ -10,13 +11,13 @@ defineProps<{
 
 <template>
   <div class="flex flex-wrap items-center gap-2">
-    <FilterSelector
+    <DocumentosFilterSelector
       :columns="columns"
       :filters="filters"
       :actions="actions"
     />
 
-    <FilterChip
+    <DocumentosFilterChip
       v-for="filter in filters"
       :key="filter.columnId"
       :filter="filter"

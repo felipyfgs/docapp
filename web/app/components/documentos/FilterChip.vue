@@ -3,7 +3,8 @@ import type { ColumnConfig, FilterModel, DataTableFilterActions, FilterOperator 
 
 const props = defineProps<{
   filter: FilterModel
-  column: ColumnConfig<unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  column: ColumnConfig<any>
   actions: DataTableFilterActions
 }>()
 
@@ -92,7 +93,7 @@ const valueOpen = ref(false)
         {{ valuesLabel }}
       </button>
       <template #content>
-        <FilterValuePicker :filter="filter" :column="column" :actions="actions" />
+        <DocumentosFilterValuePicker :filter="filter" :column="column" :actions="actions" />
       </template>
     </UPopover>
 

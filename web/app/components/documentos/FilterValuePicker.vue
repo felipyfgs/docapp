@@ -3,7 +3,8 @@ import type { ColumnConfig, FilterModel, DataTableFilterActions } from '~/compos
 
 const props = defineProps<{
   filter: FilterModel
-  column: ColumnConfig<unknown>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  column: ColumnConfig<any>
   actions: DataTableFilterActions
 }>()
 
