@@ -423,14 +423,14 @@ function downloadBlob(blob: Blob, fileName: string) {
               </template>
             </p>
           </div>
-          <p v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
+          <div v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
             {{ importResult.unknown }} arquivo(s) sem empresa correspondente — verifique se a empresa está cadastrada.
-          </p>
+          </div>
 
           <div v-if="importResult.unknown_empresas && importResult.unknown_empresas.length > 0" class="mt-4 border border-default rounded-md p-3">
-            <p class="text-sm font-medium mb-2">
+            <div class="text-sm font-medium mb-2">
               Empresas não cadastradas encontradas nos arquivos:
-            </p>
+            </div>
             <div class="space-y-2 max-h-40 overflow-y-auto">
               <div
                 v-for="emp in importResult.unknown_empresas"
