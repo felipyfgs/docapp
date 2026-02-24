@@ -464,6 +464,12 @@ func (s *SyncService) baixarDocsBloqueados(ctx context.Context, empresa model.Em
 
 		fullDoc := dlParsed.Documents[0]
 
+		// Se a SEFAZ retornou apenas o resumo (resNFe) no fallback, não podemos dar upgrade
+		if fullDoc.XMLResumo {
+			s.log.Warn().Str("chave", doc.ChaveAcesso).Msg("fallback: received resNFe instead of full XML, skipping upgrade")
+			continue
+		}
+
 		xmlObjectKey := s.storage.BuildDocumentKey(
 			fullDoc.DocumentType,
 			fullDoc.Competencia,
