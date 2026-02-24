@@ -9,20 +9,23 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center gap-2">
+  <div class="flex items-center gap-2 min-w-0">
     <DocumentosFilterSelector
       :columns="columns"
       :filters="filters"
       :actions="actions"
     />
 
-    <DocumentosFilterChip
-      v-for="filter in filters"
-      :key="filter.columnId"
-      :filter="filter"
-      :column="columns.find(c => c.id === filter.columnId)!"
-      :actions="actions"
-    />
+    <div v-if="filters.length > 0" class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
+      <DocumentosFilterChip
+        v-for="filter in filters"
+        :key="filter.columnId"
+        :filter="filter"
+        :column="columns.find(c => c.id === filter.columnId)!"
+        :actions="actions"
+        class="shrink-0"
+      />
+    </div>
 
     <UButton
       v-if="filters.length > 0"
@@ -30,8 +33,7 @@ defineProps<{
       variant="ghost"
       size="sm"
       icon="i-lucide-x"
-      label="Limpar"
-      class="h-7"
+      class="h-7 shrink-0"
       @click="actions.clearAll()"
     />
   </div>
