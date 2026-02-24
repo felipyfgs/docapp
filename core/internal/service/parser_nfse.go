@@ -23,22 +23,12 @@ type NFSeDocument struct {
 }
 
 var (
-	reNFSeChave      = regexp.MustCompile(`<chNFSe>([^<]+)</chNFSe>`)
 	reNFSeNumero     = regexp.MustCompile(`<nNFSe>([^<]+)</nNFSe>`)
-	reNFSeCompetencia = regexp.MustCompile(`<competencia>([^<]+)</competencia>`)
-	reNFSeSituacao   = regexp.MustCompile(`<sit>([^<]+)</sit>`)
-
 	reNFSeDhEmi      = regexp.MustCompile(`<dhEmi>([^<]+)</dhEmi>`)
-	reNFSeDhCompetencia = regexp.MustCompile(`<dhCompetencia>([^<]+)</dhCompetencia>`)
-
-	reNFSeVServico   = regexp.MustCompile(`<vServPrest>\s*<vReceb>([^<]+)</vReceb>`)
+	reNFSeDCompet    = regexp.MustCompile(`<dCompet>([^<]+)</dCompet>`)
 	reNFSeVLiquid    = regexp.MustCompile(`<vLiq>([^<]+)</vLiq>`)
 	reNFSeVServ      = regexp.MustCompile(`<vServ>([^<]+)</vServ>`)
-
-	reNFSePrestCNPJ  = regexp.MustCompile(`<prest>.*?<CNPJ>([^<]+)</CNPJ>`)
-	reNFSePrestNome  = regexp.MustCompile(`<prest>.*?<xNome>([^<]+)</xNome>`)
-	reNFSeTomaCNPJ   = regexp.MustCompile(`<toma>.*?<CNPJ>([^<]+)</CNPJ>`)
-	reNFSeTomaNome   = regexp.MustCompile(`<toma>.*?<xNome>([^<]+)</xNome>`)
+	reNFSeCStat      = regexp.MustCompile(`<cStat>([^<]+)</cStat>`)
 )
 
 func ParseNFSeXML(xmlContent string) NFSeDocument {
@@ -47,38 +37,46 @@ func ParseNFSeXML(xmlContent string) NFSeDocument {
 		StatusDocumento: "autorizada",
 	}
 
-	doc.ChaveAcesso = extractMatch(reNFSeChave, xmlContent)
 	doc.NumeroNFSe = extractMatch(reNFSeNumero, xmlContent)
 
-	if sit := extractMatch(reNFSeSituacao, xmlContent); sit != "" {
-		switch sit {
-		case "1":
-			doc.StatusDocumento = "autorizada"
-		case "2":
-			doc.StatusDocumento = "cancelada"
-		default:
-			doc.StatusDocumento = "autorizada"
-		}
+	// cStat: 100=autorizada, 101=cancelada
+	if cStat := extractMatch(reNFSeCStat, xmlContent); cStat == "101" {
+		doc.StatusDocumento = "cancelada"
 	}
 
-	doc.PrestadorCNPJ = extractNFSePartyField(xmlContent, "prest", "CNPJ")
-	doc.PrestadorNome = extractNFSePartyField(xmlContent, "prest", "xNome")
+	// Prestador: try <emit> first (infNFSe level), fallback to <prest> (DPS level)
+	doc.PrestadorCNPJ = extractNFSePartyField(xmlContent, "emit", "CNPJ")
+	doc.PrestadorNome = extractNFSePartyField(xmlContent, "emit", "xNome")
+	if doc.PrestadorCNPJ == "" {
+		doc.PrestadorCNPJ = extractNFSePartyField(xmlContent, "prest", "CNPJ")
+	}
+	if doc.PrestadorNome == "" {
+		doc.PrestadorNome = extractNFSePartyField(xmlContent, "prest", "xNome")
+	}
+
+	// Tomador
 	doc.TomadorCNPJ = extractNFSePartyField(xmlContent, "toma", "CNPJ")
 	doc.TomadorNome = extractNFSePartyField(xmlContent, "toma", "xNome")
 
-	if cpf := extractNFSePartyField(xmlContent, "prest", "CPF"); cpf != "" && doc.PrestadorCNPJ == "" {
-		doc.PrestadorCNPJ = cpf
+	// CPF fallback
+	if doc.PrestadorCNPJ == "" {
+		doc.PrestadorCNPJ = extractNFSePartyField(xmlContent, "emit", "CPF")
 	}
-	if cpf := extractNFSePartyField(xmlContent, "toma", "CPF"); cpf != "" && doc.TomadorCNPJ == "" {
-		doc.TomadorCNPJ = cpf
+	if doc.PrestadorCNPJ == "" {
+		doc.PrestadorCNPJ = extractNFSePartyField(xmlContent, "prest", "CPF")
+	}
+	if doc.TomadorCNPJ == "" {
+		doc.TomadorCNPJ = extractNFSePartyField(xmlContent, "toma", "CPF")
 	}
 
+	// Valores
 	doc.ValorServico = parseFloatSafe(extractMatch(reNFSeVServ, xmlContent))
 	doc.ValorLiquido = parseFloatSafe(extractMatch(reNFSeVLiquid, xmlContent))
 	if doc.ValorLiquido == 0 {
 		doc.ValorLiquido = doc.ValorServico
 	}
 
+	// Data emissao
 	if dhEmi := extractMatch(reNFSeDhEmi, xmlContent); dhEmi != "" {
 		if t, err := time.Parse(time.RFC3339, dhEmi); err == nil {
 			doc.DataEmissao = &t
@@ -87,8 +85,13 @@ func ParseNFSeXML(xmlContent string) NFSeDocument {
 		}
 	}
 
-	if comp := extractMatch(reNFSeCompetencia, xmlContent); comp != "" {
-		doc.Competencia = comp[:7] // YYYY-MM
+	// Competencia: <dCompet> first, fallback to data emissao
+	if comp := extractMatch(reNFSeDCompet, xmlContent); comp != "" {
+		if len(comp) >= 7 {
+			doc.Competencia = comp[:7]
+		} else {
+			doc.Competencia = comp
+		}
 	} else if doc.DataEmissao != nil {
 		doc.Competencia = doc.DataEmissao.Format("2006-01")
 	}
