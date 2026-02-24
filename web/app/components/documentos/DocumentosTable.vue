@@ -25,10 +25,15 @@ const UDropdownMenu = resolveComponent('UDropdownMenu')
 const table = useTemplateRef<{ tableApi: any }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
-const columnVisibility = ref<Record<string, boolean>>({})
+const columnVisibility = ref<Record<string, boolean>>({
+  chave_acesso: false,
+  xml_resumo: false,
+  manifestacao_status: false
+})
 const rowSelection = ref<Record<string, boolean>>({})
 
-const pagination = ref({ pageIndex: 0, pageSize: 10 })
+const pagination = ref({ pageIndex: 0, pageSize: 15 })
+const showFilters = ref(false)
 
 const search = defineModel<string>('search', { default: '' })
 const tipoFilter = defineModel<string>('tipoFilter', { default: 'all' })
@@ -89,6 +94,22 @@ const competenciaOptions = computed(() => {
   const all = [...new Set((props.data ?? []).map(d => d.competencia).filter(Boolean))]
   return all.sort().reverse().map(c => ({ label: c, value: c }))
 })
+
+const activeFilterCount = computed(() => [
+  tipoFilter.value !== 'all',
+  statusFilter.value !== 'all',
+  resumoFilter.value !== 'all',
+  competenciaFilter.value !== 'all',
+  manifestacaoFilter.value !== 'all'
+].filter(Boolean).length)
+
+function clearFilters() {
+  tipoFilter.value = 'all'
+  statusFilter.value = 'all'
+  resumoFilter.value = 'all'
+  competenciaFilter.value = 'all'
+  manifestacaoFilter.value = 'all'
+}
 
 const selectedRows = computed((): DocumentoFiscal[] => {
   if (!table.value?.tableApi) return []
@@ -175,6 +196,8 @@ function statusBadge(documento: DocumentoFiscal): { label: string, color: 'succe
 const columns: TableColumn<DocumentoFiscal>[] = [
   {
     id: 'select',
+    enableHiding: false,
+    enableSorting: false,
     header: ({ table }) =>
       h(UCheckbox, {
         'modelValue': table.getIsSomePageRowsSelected()
@@ -298,6 +321,7 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   },
   {
     accessorKey: 'valor_total',
+    meta: { class: { th: 'text-right', td: 'text-right' } },
     header: ({ column }) => {
       const isSorted = column.getIsSorted()
       return h(UButton, {
@@ -316,23 +340,23 @@ const columns: TableColumn<DocumentoFiscal>[] = [
     cell: ({ row }) => {
       const v = row.original.valor_total
       if (!v || v === 0) return h('span', { class: 'text-muted' }, '—')
-      return h('span', { class: 'font-mono text-xs' }, formatBRL(v))
+      return h('span', { class: 'font-mono text-xs tabular-nums' }, formatBRL(v))
     }
   },
   {
     id: 'actions',
+    enableHiding: false,
+    meta: { class: { td: 'text-right' } },
     cell: ({ row }) =>
-      h('div', { class: 'text-right' },
-        h(UDropdownMenu, {
-          content: { align: 'end' },
-          items: rowItems(row)
-        }, () => h(UButton, {
-          icon: 'i-lucide-ellipsis-vertical',
-          color: 'neutral',
-          variant: 'ghost',
-          class: 'ml-auto'
-        }))
-      )
+      h(UDropdownMenu, {
+        content: { align: 'end' },
+        items: rowItems(row)
+      }, () => h(UButton, {
+        icon: 'i-lucide-ellipsis-vertical',
+        color: 'neutral',
+        variant: 'ghost',
+        class: 'ml-auto'
+      }))
   }
 ]
 
@@ -359,79 +383,25 @@ function getVisibilityItems() {
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-1.5">
+  <!-- Row 1: search + actions + column visibility -->
+  <div class="flex flex-wrap items-center gap-2">
     <UInput
       v-model="search"
       icon="i-lucide-search"
-      placeholder="Filtrar por chave, número, emitente, destinatário..."
-      class="max-w-md"
+      placeholder="Emitente, destinatário, chave, número..."
+      class="flex-1 min-w-52"
     />
 
-    <div class="flex flex-wrap items-center gap-1.5">
+    <div class="flex items-center gap-2 ml-auto">
       <slot name="actions" :selected-rows="selectedRows" />
 
-      <USelect
-        v-model="tipoFilter"
-        :items="[
-          { label: 'Todos os tipos', value: 'all' },
-          { label: 'NF-e', value: 'nf-e' },
-          { label: 'NFC-e', value: 'nfc-e' },
-          { label: 'CT-e', value: 'ct-e' },
-          { label: 'NFS-e', value: 'nfs-e' },
-          { label: 'Desconhecido', value: 'desconhecido' }
-        ]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="Tipo"
-        class="min-w-36"
-      />
-
-      <USelect
-        v-model="statusFilter"
-        :items="[
-          { label: 'Todos os status', value: 'all' },
-          { label: 'Autorizada', value: 'autorizada' },
-          { label: 'Cancelada', value: 'cancelada' },
-          { label: 'Denegada', value: 'denegada' },
-          { label: 'Desconhecido', value: 'desconhecido' }
-        ]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="Status"
-        class="min-w-36"
-      />
-
-      <USelect
-        v-model="resumoFilter"
-        :items="[
-          { label: 'XML completo e resumo', value: 'all' },
-          { label: 'Apenas XML completo', value: 'completo' },
-          { label: 'Apenas XML resumo', value: 'resumo' }
-        ]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="XML"
-        class="min-w-48"
-      />
-
-      <USelect
-        v-model="competenciaFilter"
-        :items="[{ label: 'Todas as competências', value: 'all' }, ...competenciaOptions]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="Competência"
-        class="min-w-44"
-      />
-
-      <USelect
-        v-model="manifestacaoFilter"
-        :items="[
-          { label: 'Todas as manifestações', value: 'all' },
-          { label: 'Ciência', value: 'ciencia' },
-          { label: 'Confirmada', value: 'confirmada' },
-          { label: 'Desconhecida', value: 'desconhecida' },
-          { label: 'Não Realizada', value: 'nao_realizada' },
-          { label: 'Pendente', value: 'pendente' }
-        ]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="Manifestação"
-        class="min-w-44"
+      <UButton
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-sliders-horizontal"
+        :label="activeFilterCount > 0 ? `Filtros (${activeFilterCount})` : 'Filtros'"
+        :class="activeFilterCount > 0 ? 'text-primary' : ''"
+        @click="showFilters = !showFilters"
       />
 
       <UDropdownMenu
@@ -439,13 +409,85 @@ function getVisibilityItems() {
         :content="{ align: 'end' }"
       >
         <UButton
-          label="Exibir"
           color="neutral"
           variant="outline"
-          trailing-icon="i-lucide-settings-2"
+          icon="i-lucide-columns-3"
+          label="Colunas"
         />
       </UDropdownMenu>
     </div>
+  </div>
+
+  <!-- Row 2: filters (collapsible) -->
+  <div v-if="showFilters" class="flex flex-wrap items-center gap-2 pt-1">
+    <USelect
+      v-model="tipoFilter"
+      :items="[
+        { label: 'Todos os tipos', value: 'all' },
+        { label: 'NF-e', value: 'nf-e' },
+        { label: 'NFC-e', value: 'nfc-e' },
+        { label: 'CT-e', value: 'ct-e' },
+        { label: 'NFS-e', value: 'nfs-e' },
+        { label: 'Desconhecido', value: 'desconhecido' }
+      ]"
+      placeholder="Tipo"
+      class="w-36"
+    />
+
+    <USelect
+      v-model="statusFilter"
+      :items="[
+        { label: 'Todos os status', value: 'all' },
+        { label: 'Autorizada', value: 'autorizada' },
+        { label: 'Cancelada', value: 'cancelada' },
+        { label: 'Denegada', value: 'denegada' },
+        { label: 'Desconhecido', value: 'desconhecido' }
+      ]"
+      placeholder="Status"
+      class="w-36"
+    />
+
+    <USelect
+      v-model="resumoFilter"
+      :items="[
+        { label: 'Completo e resumo', value: 'all' },
+        { label: 'Apenas completo', value: 'completo' },
+        { label: 'Apenas resumo', value: 'resumo' }
+      ]"
+      placeholder="XML"
+      class="w-40"
+    />
+
+    <USelect
+      v-model="competenciaFilter"
+      :items="[{ label: 'Todas as competências', value: 'all' }, ...competenciaOptions]"
+      placeholder="Competência"
+      class="w-44"
+    />
+
+    <USelect
+      v-model="manifestacaoFilter"
+      :items="[
+        { label: 'Todas as manifestações', value: 'all' },
+        { label: 'Ciência', value: 'ciencia' },
+        { label: 'Confirmada', value: 'confirmada' },
+        { label: 'Desconhecida', value: 'desconhecida' },
+        { label: 'Não Realizada', value: 'nao_realizada' },
+        { label: 'Pendente', value: 'pendente' }
+      ]"
+      placeholder="Manifestação"
+      class="w-44"
+    />
+
+    <UButton
+      v-if="activeFilterCount > 0"
+      color="neutral"
+      variant="ghost"
+      icon="i-lucide-x"
+      label="Limpar"
+      size="sm"
+      @click="clearFilters"
+    />
   </div>
 
   <UTable
@@ -458,13 +500,14 @@ function getVisibilityItems() {
     :data="filtered"
     :columns="columns"
     :loading="status === 'pending'"
+    sticky
     class="shrink-0"
     :ui="{
       base: 'table-fixed border-separate border-spacing-0',
       thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
       tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'border-b border-default',
+      th: 'px-3 py-2 text-xs first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
+      td: 'px-3 py-2 text-sm border-b border-default',
       separator: 'h-0'
     }"
   />
