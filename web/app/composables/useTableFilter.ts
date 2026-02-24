@@ -8,13 +8,16 @@ export interface ColumnOption {
   icon?: string
 }
 
-export interface ColumnConfig<TData = unknown> {
+export interface ColumnConfigBase {
   id: string
-  accessor: (row: TData) => string | null | undefined
   displayName: string
   icon: string
   type: ColumnDataType
   options?: MaybeRefOrGetter<ColumnOption[]>
+}
+
+export interface ColumnConfig<TData = unknown> extends ColumnConfigBase {
+  accessor: (row: TData) => string | null | undefined
 }
 
 export type OptionFilterOperator = 'is' | 'is not'

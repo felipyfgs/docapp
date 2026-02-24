@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
-import type { Row } from '@tanstack/table-core'
+import type { Column, Row, Table } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
 
 const props = defineProps<{
@@ -22,8 +22,7 @@ const UButton = resolveComponent('UButton')
 const UCheckbox = resolveComponent('UCheckbox')
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const table = useTemplateRef<{ tableApi: any }>('table')
+const table = useTemplateRef<{ tableApi: Table<Empresa> }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
 const columnVisibility = ref<Record<string, boolean>>({})
@@ -307,10 +306,8 @@ function getVisibilityItems() {
   if (!table.value?.tableApi) return []
   return table.value.tableApi
     .getAllColumns()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .filter((column: any) => column.getCanHide())
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    .map((column: any) => ({
+    .filter((column: Column<Empresa>) => column.getCanHide())
+    .map((column: Column<Empresa>) => ({
       label: columnLabels[column.id] ?? column.id,
       type: 'checkbox' as const,
       checked: column.getIsVisible(),

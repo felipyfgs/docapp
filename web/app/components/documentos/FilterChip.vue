@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import type { ColumnConfig, FilterModel, DataTableFilterActions, FilterOperator } from '~/composables/useTableFilter'
+import type { ColumnConfigBase, FilterModel, DataTableFilterActions, FilterOperator } from '~/composables/useTableFilter'
 
 const props = defineProps<{
   filter: FilterModel
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  column: ColumnConfig<any>
+  column: ColumnConfigBase
   actions: DataTableFilterActions
 }>()
 

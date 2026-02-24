@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { ColumnConfig, FilterModel, DataTableFilterActions } from '~/composables/useTableFilter'
+import type { ColumnConfigBase, FilterModel, DataTableFilterActions } from '~/composables/useTableFilter'
 
 const props = defineProps<{
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  columns: ColumnConfig<any>[]
+  columns: ColumnConfigBase[]
   filters: FilterModel[]
   actions: DataTableFilterActions
 }>()
@@ -34,8 +33,7 @@ const quickSearchResults = computed(() => {
   const q = search.value.trim().toLowerCase()
   if (q.length < 2) return []
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results: Array<{ column: ColumnConfig<any>, option: { label: string, value: string } }> = []
+  const results: Array<{ column: ColumnConfigBase, option: { label: string, value: string } }> = []
 
   for (const col of props.columns) {
     if (col.type !== 'option') continue
@@ -60,7 +58,7 @@ function selectColumn(columnId: string) {
   search.value = ''
 }
 
-function quickSelectOption(column: ColumnConfig<unknown>, optionValue: string) {
+function quickSelectOption(column: ColumnConfigBase, optionValue: string) {
   props.actions.addFilterValue(column.id, optionValue)
   open.value = false
 }
