@@ -63,26 +63,18 @@ function quickSelectOption(column: ColumnConfigBase, optionValue: string) {
   open.value = false
 }
 
-function handleOpenChange(val: boolean) {
-  open.value = val
+watch(open, (val) => {
   if (!val) {
     setTimeout(() => {
       search.value = ''
       selectedColumnId.value = null
     }, 150)
   }
-}
-
-// When a filter is added via quickSearch, ensure a matching filter chip exists
-watch(selectedFilter, (filter) => {
-  if (selectedColumn.value && !filter) {
-    props.actions.addFilter(selectedColumn.value.id)
-  }
 })
 </script>
 
 <template>
-  <UPopover :open="open" :content="{ align: 'start', side: 'bottom' }" @update:open="handleOpenChange">
+  <UPopover v-model:open="open" :content="{ align: 'start', side: 'bottom' }">
     <UButton
       color="neutral"
       variant="outline"
@@ -90,7 +82,6 @@ watch(selectedFilter, (filter) => {
       :label="hasFilters ? undefined : 'Filtrar'"
       size="sm"
       class="h-7"
-      @click="open = !open"
     />
 
     <template #content>

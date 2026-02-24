@@ -59,10 +59,7 @@ const valueOpen = ref(false)
 
     <!-- Operator -->
     <UPopover v-model:open="operatorOpen" :content="{ align: 'start', side: 'bottom' }">
-      <button
-        class="px-2 h-full hover:bg-elevated/80 text-muted transition-colors"
-        @click="operatorOpen = !operatorOpen"
-      >
+      <button class="px-2 h-full hover:bg-elevated/80 text-muted transition-colors">
         {{ operatorLabel }}
       </button>
       <template #content>
@@ -85,10 +82,7 @@ const valueOpen = ref(false)
 
     <!-- Values -->
     <UPopover v-model:open="valueOpen" :content="{ align: 'start', side: 'bottom' }">
-      <button
-        class="px-2 h-full hover:bg-elevated/80 transition-colors max-w-40 truncate"
-        @click="valueOpen = !valueOpen"
-      >
+      <button class="px-2 h-full hover:bg-elevated/80 transition-colors max-w-40 truncate">
         {{ valuesLabel }}
       </button>
       <template #content>
