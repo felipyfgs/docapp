@@ -24,6 +24,11 @@ type SyncStatePatch struct {
 	SetDownloadBlockedUntil bool
 	UltimoCStat             *string
 	UltimoXMotivo           *string
+	NFSeHabilitada          *bool
+	UltNSUNFSe              *string
+	UltimaSyncNFSe          *time.Time
+	NFSeBlockedUntil        *time.Time
+	SetNFSeBlockedUntil     bool
 }
 
 type EmpresaRepository struct {
@@ -283,6 +288,22 @@ func (r *EmpresaRepository) UpdateSyncState(ctx context.Context, empresaID uint,
 	}
 	if patch.UltimoXMotivo != nil {
 		query = query.Set("ultimo_xmotivo = ?", strings.TrimSpace(*patch.UltimoXMotivo))
+	}
+	if patch.NFSeHabilitada != nil {
+		query = query.Set("nfse_habilitada = ?", *patch.NFSeHabilitada)
+	}
+	if patch.UltNSUNFSe != nil {
+		query = query.Set("ult_nsu_nfse = ?", strings.TrimSpace(*patch.UltNSUNFSe))
+	}
+	if patch.UltimaSyncNFSe != nil {
+		query = query.Set("ultima_sync_nfse = ?", *patch.UltimaSyncNFSe)
+	}
+	if patch.SetNFSeBlockedUntil {
+		if patch.NFSeBlockedUntil == nil {
+			query = query.Set("nfse_blocked_until = NULL")
+		} else {
+			query = query.Set("nfse_blocked_until = ?", *patch.NFSeBlockedUntil)
+		}
 	}
 
 	query = query.Set("updated_at = ?", time.Now())

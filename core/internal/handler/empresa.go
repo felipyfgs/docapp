@@ -316,6 +316,9 @@ func (h *EmpresaHandler) Overview(w http.ResponseWriter, r *http.Request) {
 			"ultimo_xmotivo":       s.UltimoXMotivo,
 			"ativo":                s.Ativo,
 			"lookback_days":        s.LookbackDays,
+			"nfse_habilitada":      s.NFSeHabilitada,
+			"ult_nsu_nfse":         s.UltNSUNFSe,
+			"ultima_sync_nfse":     s.UltimaSyncNFSe,
 		}
 	}
 
@@ -326,6 +329,32 @@ func (h *EmpresaHandler) Overview(w http.ResponseWriter, r *http.Request) {
 		"documentos_por_competencia": porCompetencia,
 		"documentos_recentes":        recentes,
 	})
+}
+
+func (h *EmpresaHandler) ToggleNFSe(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid id"})
+		return
+	}
+
+	var body struct {
+		Habilitada bool `json:"habilitada"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid body"})
+		return
+	}
+
+	if err := h.svc.UpdateSyncState(id, repository.SyncStatePatch{
+		NFSeHabilitada: &body.Habilitada,
+	}); err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("toggle nfse failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 func parseID(r *http.Request) (uint, error) {

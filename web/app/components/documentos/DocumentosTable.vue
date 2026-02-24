@@ -18,17 +18,35 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const UBadge = resolveComponent('UBadge')
+const UTooltip = resolveComponent('UTooltip')
 const UButton = resolveComponent('UButton')
 const UCheckbox = resolveComponent('UCheckbox')
+
+function sortableHeader(label: string) {
+  return ({ column }: { column: Column<DocumentoFiscal> }) => {
+    const isSorted = column.getIsSorted()
+    return h(UButton, {
+      color: 'neutral',
+      variant: 'ghost',
+      label,
+      icon: isSorted
+        ? isSorted === 'asc'
+          ? 'i-lucide-arrow-up-narrow-wide'
+          : 'i-lucide-arrow-down-wide-narrow'
+        : 'i-lucide-arrow-up-down',
+      class: '-mx-2.5',
+      onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+    })
+  }
+}
 const UDropdownMenu = resolveComponent('UDropdownMenu')
 
 const table = useTemplateRef<{ tableApi: Table<DocumentoFiscal> }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
 const columnVisibility = ref<Record<string, boolean>>({
-  chave_acesso: false,
-  xml_resumo: false,
-  manifestacao_status: false
+  manifestacao_status: false,
+  created_at: false
 })
 const rowSelection = ref<Record<string, boolean>>({})
 
@@ -233,22 +251,42 @@ const columns: TableColumn<DocumentoFiscal>[] = [
       })
   },
   {
+    accessorKey: 'tipo_documento',
+    header: sortableHeader('Tipo'),
+    cell: ({ row }) => {
+      const tipo = tipoBadge(row.original)
+      return h(UBadge, { variant: 'subtle', color: tipo.color }, () => tipo.label)
+    }
+  },
+  {
+    accessorKey: 'numero_documento',
+    header: sortableHeader('Número'),
+    cell: ({ row }) => {
+      const num = row.original.numero_documento
+      const chave = row.original.chave_acesso
+      return h('div', { class: 'flex items-center gap-1.5 whitespace-nowrap' }, [
+        num ? h('span', { class: 'font-medium' }, `#${num}`) : h('span', { class: 'text-muted' }, '—'),
+        chave
+          ? h(UTooltip, { text: chave, content: { side: 'right' } }, () =>
+              h(UButton, {
+                icon: 'i-lucide-key-round',
+                color: 'neutral',
+                variant: 'ghost',
+                size: 'xs',
+                class: 'size-5',
+                onClick: () => {
+                  navigator.clipboard.writeText(chave)
+                  toast.add({ title: 'Chave copiada', color: 'success' })
+                }
+              })
+            )
+          : null
+      ])
+    }
+  },
+  {
     accessorKey: 'emitente_nome',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Emitente',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Emitente'),
     cell: ({ row }) => h('div', { class: 'min-w-48' }, [
       h('p', { class: 'font-medium text-highlighted truncate' }, row.original.emitente_nome || '—'),
       h('p', { class: 'text-xs text-muted truncate' }, formatCNPJ(row.original.emitente_cnpj))
@@ -256,79 +294,21 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   },
   {
     accessorKey: 'destinatario_cnpj',
-    header: 'Destinatário',
+    header: sortableHeader('Destinatário'),
     cell: ({ row }) => h('span', { class: 'text-sm font-mono whitespace-nowrap' }, formatCNPJ(row.original.destinatario_cnpj) || '—')
   },
-  {
-    accessorKey: 'tipo_documento',
-    header: 'Tipo',
-    cell: ({ row }) => {
-      const tipo = tipoBadge(row.original)
-      return h(UBadge, { variant: 'subtle', color: tipo.color }, () => tipo.label)
-    }
-  },
+
   {
     accessorKey: 'status_documento',
-    header: 'Status',
+    header: sortableHeader('Status'),
     cell: ({ row }) => {
       const status = statusBadge(row.original)
       return h(UBadge, { variant: 'subtle', color: status.color }, () => status.label)
     }
   },
   {
-    accessorKey: 'chave_acesso',
-    header: 'Chave',
-    cell: ({ row }) => h('p', { class: 'font-mono text-xs truncate max-w-56' }, row.original.chave_acesso || '—')
-  },
-  {
-    accessorKey: 'numero_documento',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Número',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
-    cell: ({ row }) => row.original.numero_documento || '—'
-  },
-  {
-    accessorKey: 'competencia',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Competência',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
-    cell: ({ row }) => row.original.competencia || '—'
-  },
-  {
-    accessorKey: 'xml_resumo',
-    header: 'XML',
-    cell: ({ row }) => h(UBadge, {
-      variant: 'subtle',
-      color: row.original.xml_resumo ? 'warning' : 'success'
-    }, () => row.original.xml_resumo ? 'Resumo' : 'Completo')
-  },
-  {
     accessorKey: 'manifestacao_status',
-    header: 'Manifestação',
+    header: sortableHeader('Manifestação'),
     cell: ({ row }) => {
       const status = row.original.manifestacao_status
       const badge = manifestacaoBadge(status)
@@ -338,25 +318,29 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   {
     accessorKey: 'valor_total',
     meta: { class: { th: 'text-right', td: 'text-right' } },
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Valor',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Valor'),
     cell: ({ row }) => {
       const v = row.original.valor_total
       if (!v || v === 0) return h('span', { class: 'text-muted' }, '—')
       return h('span', { class: 'font-mono text-xs tabular-nums' }, formatBRL(v))
+    }
+  },
+  {
+    accessorKey: 'data_emissao',
+    header: sortableHeader('Emissão'),
+    cell: ({ row }) => {
+      const d = row.original.data_emissao
+      if (!d) return h('span', { class: 'text-muted' }, '—')
+      return h('span', { class: 'whitespace-nowrap' }, new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }))
+    }
+  },
+  {
+    accessorKey: 'created_at',
+    header: sortableHeader('Recebido'),
+    cell: ({ row }) => {
+      const d = row.original.created_at
+      if (!d) return h('span', { class: 'text-muted' }, '—')
+      return h('span', { class: 'whitespace-nowrap' }, new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }))
     }
   },
   {
@@ -376,6 +360,18 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   }
 ]
 
+const columnLabels: Record<string, string> = {
+  tipo_documento: 'Tipo',
+  numero_documento: 'Número',
+  emitente_nome: 'Emitente',
+  destinatario_cnpj: 'Destinatário',
+  status_documento: 'Status',
+  manifestacao_status: 'Manifestação',
+  valor_total: 'Valor',
+  data_emissao: 'Emissão',
+  created_at: 'Recebido'
+}
+
 function getVisibilityItems() {
   if (!table.value?.tableApi) return []
 
@@ -383,7 +379,7 @@ function getVisibilityItems() {
     .getAllColumns()
     .filter((column: Column<DocumentoFiscal>) => column.getCanHide())
     .map((column: Column<DocumentoFiscal>) => ({
-      label: upperFirst(column.id),
+      label: columnLabels[column.id] || upperFirst(column.id),
       type: 'checkbox' as const,
       checked: column.getIsVisible(),
       onUpdateChecked(checked: boolean) {
@@ -470,7 +466,8 @@ function getVisibilityItems() {
               { label: '25', value: '25' },
               { label: '50', value: '50' },
               { label: '100', value: '100' },
-              { label: '200', value: '200' }
+              { label: '200', value: '200' },
+              { label: 'Todos', value: String(totalFilteredRows || 9999) }
             ]"
             class="w-20"
             @update:model-value="(val: string) => { pagination = { pageIndex: 0, pageSize: Number(val) } }"

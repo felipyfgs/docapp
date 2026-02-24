@@ -31,6 +31,7 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 		r.Post("/{id}/sync", empresa.Sync)
 		r.Post("/{id}/import", empresa.Import)
 		r.Get("/{id}/overview", empresa.Overview)
+		r.Patch("/{id}/nfse", empresa.ToggleNFSe)
 	})
 
 	r.Route("/documentos", func(r chi.Router) {

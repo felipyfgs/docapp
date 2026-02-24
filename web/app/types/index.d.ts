@@ -150,6 +150,9 @@ export interface EmpresaSyncState {
   ultimo_xmotivo: string
   ativo: boolean
   lookback_days: number
+  nfse_habilitada: boolean
+  ult_nsu_nfse: string
+  ultima_sync_nfse?: string
 }
 
 export interface EmpresaDocumentoStats {

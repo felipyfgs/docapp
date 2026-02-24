@@ -44,6 +44,7 @@ func main() {
 	documentoRepo := repository.NewDocumentoRepository(bunDB)
 	empresaService := service.NewEmpresaService(empresaRepo)
 	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
+	nfseSyncService := service.NewNFSeSyncService(empresaRepo, documentoRepo, storage, log)
 
 	interval := time.Duration(cfg.WorkerIntervalMinutes) * time.Minute
 	log.Info().Dur("interval", interval).Str("sped_url", cfg.SpedServiceURL).Msg("worker starting")
@@ -51,7 +52,7 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	run(log, empresaService, syncService)
+	run(log, empresaService, syncService, nfseSyncService)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -59,7 +60,7 @@ func main() {
 	for {
 		select {
 		case <-ticker.C:
-			run(log, empresaService, syncService)
+			run(log, empresaService, syncService, nfseSyncService)
 		case sig := <-sigChan:
 			log.Info().Str("signal", sig.String()).Msg("shutting down worker")
 			return
@@ -67,7 +68,7 @@ func main() {
 	}
 }
 
-func run(log zerolog.Logger, empresaService *service.EmpresaService, syncService *service.SyncService) {
+func run(log zerolog.Logger, empresaService *service.EmpresaService, syncService *service.SyncService, nfseSyncService *service.NFSeSyncService) {
 	start := time.Now()
 
 	empresas, err := empresaService.ListAtivasComCertificado()
@@ -94,10 +95,16 @@ func run(log zerolog.Logger, empresaService *service.EmpresaService, syncService
 
 	for _, empresa := range empresas {
 		if err := syncService.SyncEmpresa(empresa); err != nil {
-			log.Error().Err(err).Uint("empresa_id", empresa.ID).Str("cnpj", empresa.CNPJ).Msg("worker: sync failed")
+			log.Error().Err(err).Uint("empresa_id", empresa.ID).Str("cnpj", empresa.CNPJ).Msg("worker: nfe sync failed")
 			errorCount++
 		} else {
 			successCount++
+		}
+
+		if empresa.NFSeHabilitada {
+			if err := nfseSyncService.SyncEmpresaNFSe(empresa); err != nil {
+				log.Error().Err(err).Uint("empresa_id", empresa.ID).Str("cnpj", empresa.CNPJ).Msg("worker: nfse sync failed")
+			}
 		}
 	}
 

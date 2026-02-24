@@ -47,6 +47,8 @@ type Empresa struct {
 	CertificadoValidoAte *time.Time `bun:"-" json:"certificado_valido_ate"`
 	CertificadoPFX       []byte     `bun:"-" json:"-"`
 	CertificadoSenha     string     `bun:"-" json:"-"`
+	NFSeHabilitada       bool       `bun:"-" json:"nfse_habilitada"`
+	UltNSUNFSe           string     `bun:"-" json:"ult_nsu_nfse"`
 }
 
 func (e *Empresa) CertificadoStatus() string {
@@ -79,6 +81,8 @@ func (e *Empresa) HydrateFromRelations() {
 		e.UltNSU = e.SyncState.UltNSU
 		e.Ativo = e.SyncState.Ativo
 		e.UltimaSincronizacao = e.SyncState.UltimaSincronizacao
+		e.NFSeHabilitada = e.SyncState.NFSeHabilitada
+		e.UltNSUNFSe = e.SyncState.UltNSUNFSe
 	}
 
 	if e.Certificado != nil {
@@ -122,6 +126,10 @@ type EmpresaSyncState struct {
 	DownloadBlockedUntil *time.Time `bun:"download_blocked_until,nullzero" json:"download_blocked_until"`
 	UltimoCStat          string     `bun:"ultimo_cstat" json:"ultimo_cstat"`
 	UltimoXMotivo        string     `bun:"ultimo_xmotivo" json:"ultimo_xmotivo"`
+	NFSeHabilitada       bool       `bun:"nfse_habilitada,notnull" json:"nfse_habilitada"`
+	UltNSUNFSe           string     `bun:"ult_nsu_nfse,notnull" json:"ult_nsu_nfse"`
+	UltimaSyncNFSe       *time.Time `bun:"ultima_sync_nfse,nullzero" json:"ultima_sync_nfse"`
+	NFSeBlockedUntil     *time.Time `bun:"nfse_blocked_until,nullzero" json:"nfse_blocked_until"`
 }
 
 type DocumentoFiscal struct {

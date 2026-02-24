@@ -35,6 +35,20 @@ async function handleSync() {
   }
 }
 
+const togglingNFSe = ref(false)
+async function toggleNFSe(val: boolean) {
+  togglingNFSe.value = true
+  try {
+    await $fetch(`/api/empresas/${id.value}/nfse`, { method: 'PATCH', body: { habilitada: val } })
+    toast.add({ title: val ? 'NFS-e habilitada' : 'NFS-e desabilitada', color: 'success' })
+    refresh()
+  } catch {
+    toast.add({ title: 'Erro ao alterar NFS-e', color: 'error' })
+  } finally {
+    togglingNFSe.value = false
+  }
+}
+
 const importOpen = ref(false)
 const importing = ref(false)
 const importFile = ref<File | null>(null)
@@ -329,6 +343,30 @@ const tableColumns: TableColumn<DocumentoFiscal>[] = [
                     >
                       {{ syncState.ultimo_cstat }}
                     </UBadge>
+                  </div>
+                </div>
+
+                <USeparator />
+
+                <div class="flex items-center justify-between">
+                  <div>
+                    <span class="font-medium">NFS-e Nacional</span>
+                    <span class="block text-xs text-muted">Distribuição via ADN (API REST)</span>
+                  </div>
+                  <USwitch
+                    :model-value="syncState?.nfse_habilitada ?? false"
+                    :loading="togglingNFSe"
+                    @update:model-value="toggleNFSe"
+                  />
+                </div>
+                <div v-if="syncState?.nfse_habilitada" class="grid grid-cols-2 gap-4">
+                  <div>
+                    <span class="block text-xs text-muted mb-1">Última sync NFS-e</span>
+                    <span class="font-medium">{{ formatDate(syncState.ultima_sync_nfse) }}</span>
+                  </div>
+                  <div>
+                    <span class="block text-xs text-muted mb-1">NSU NFS-e</span>
+                    <span class="font-mono text-xs">{{ syncState.ult_nsu_nfse || '—' }}</span>
                   </div>
                 </div>
               </div>

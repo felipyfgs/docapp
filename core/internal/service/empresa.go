@@ -58,6 +58,10 @@ func (s *EmpresaService) UpdateUltNSU(id uint, ultNSU string) error {
 	return s.repo.UpdateSyncState(context.Background(), id, repository.SyncStatePatch{UltNSU: &trimmed})
 }
 
+func (s *EmpresaService) UpdateSyncState(id uint, patch repository.SyncStatePatch) error {
+	return s.repo.UpdateSyncState(context.Background(), id, patch)
+}
+
 func (s *EmpresaService) UpdateCertificadoPFX(id uint, pfx []byte, senha, siglaUF string, tpAmb int) error {
 	if len(pfx) == 0 {
 		return errors.New("certificado pfx vazio")
