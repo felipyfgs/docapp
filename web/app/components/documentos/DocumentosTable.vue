@@ -476,7 +476,7 @@ function getVisibilityItems() {
               { label: '200', value: '200' }
             ]"
             class="w-20"
-            @update:model-value="(val: string) => { pagination.pageSize = Number(val); pagination.pageIndex = 0 }"
+            @update:model-value="(val: string) => { pagination = { pageIndex: 0, pageSize: Number(val) } }"
           />
         </div>
       </div>
@@ -485,7 +485,7 @@ function getVisibilityItems() {
         :page="pagination.pageIndex + 1"
         :items-per-page="pagination.pageSize"
         :total="totalFilteredRows"
-        @update:page="(page: number) => { pagination.pageIndex = page - 1 }"
+        @update:page="(page: number) => { pagination = { ...pagination, pageIndex: page - 1 } }"
       />
     </div>
   </ClientOnly>
