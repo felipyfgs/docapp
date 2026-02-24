@@ -35,7 +35,7 @@ const exporting = ref(false)
 const backfilling = ref(false)
 
 type AutoImportResult = {
-  by_empresa: Record<string, { imported: number; failed: number; errors?: string[] }>
+  by_empresa: Record<string, { imported: number, failed: number, errors?: string[] }>
   unknown: number
 }
 
@@ -326,7 +326,12 @@ function downloadBlob(blob: Blob, fileName: string) {
     </template>
   </UDashboardPanel>
 
-  <UModal v-model:open="importOpen" title="Importar documentos" description="A empresa é detectada automaticamente pelo CNPJ de cada XML." :ui="{ footer: 'justify-end' }">
+  <UModal
+    v-model:open="importOpen"
+    title="Importar documentos"
+    description="A empresa é detectada automaticamente pelo CNPJ de cada XML."
+    :ui="{ footer: 'justify-end' }"
+  >
     <template #body>
       <div class="space-y-4">
         <input
@@ -362,10 +367,14 @@ function downloadBlob(blob: Blob, fileName: string) {
             class="rounded-lg px-3 py-2 text-sm"
             :class="r.failed > 0 ? 'bg-warning/10' : 'bg-success/10'"
           >
-            <p class="font-medium text-highlighted truncate">{{ empresa }}</p>
+            <p class="font-medium text-highlighted truncate">
+              {{ empresa }}
+            </p>
             <p class="text-xs text-muted mt-0.5">
               {{ r.imported }} importado{{ r.imported !== 1 ? 's' : '' }}
-              <template v-if="r.failed > 0"> · {{ r.failed }} falha{{ r.failed !== 1 ? 's' : '' }}</template>
+              <template v-if="r.failed > 0">
+                · {{ r.failed }} falha{{ r.failed !== 1 ? 's' : '' }}
+              </template>
             </p>
           </div>
           <p v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
@@ -376,7 +385,12 @@ function downloadBlob(blob: Blob, fileName: string) {
     </template>
 
     <template #footer>
-      <UButton label="Cancelar" color="neutral" variant="ghost" @click="closeImport" />
+      <UButton
+        label="Cancelar"
+        color="neutral"
+        variant="ghost"
+        @click="closeImport"
+      />
       <UButton
         label="Importar"
         icon="i-lucide-upload"

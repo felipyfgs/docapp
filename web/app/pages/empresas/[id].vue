@@ -36,7 +36,7 @@ async function handleSync() {
 const importOpen = ref(false)
 const importing = ref(false)
 const importFile = ref<File | null>(null)
-const importResult = ref<{ imported: number; failed: number; errors?: string[] } | null>(null)
+const importResult = ref<{ imported: number, failed: number, errors?: string[] } | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 
 function onFileChange(e: Event) {
@@ -56,7 +56,7 @@ async function handleImport() {
   try {
     const form = new FormData()
     form.append('file', importFile.value)
-    const result = await $fetch<{ imported: number; failed: number; errors?: string[] }>(
+    const result = await $fetch<{ imported: number, failed: number, errors?: string[] }>(
       `/api/empresas/${id.value}/import`,
       { method: 'POST', body: form }
     )
@@ -537,14 +537,23 @@ function statusColor(s: string) {
           </template>
         </p>
         <ul v-if="importResult.errors?.length" class="mt-1 list-disc list-inside text-xs text-muted space-y-0.5">
-          <li v-for="(err, i) in importResult.errors.slice(0, 5)" :key="i">{{ err }}</li>
-          <li v-if="importResult.errors.length > 5">...e mais {{ importResult.errors.length - 5 }} erro(s)</li>
+          <li v-for="(err, i) in importResult.errors.slice(0, 5)" :key="i">
+            {{ err }}
+          </li>
+          <li v-if="importResult.errors.length > 5">
+            ...e mais {{ importResult.errors.length - 5 }} erro(s)
+          </li>
         </ul>
       </div>
     </template>
 
     <template #footer>
-      <UButton label="Cancelar" color="neutral" variant="ghost" @click="closeImport" />
+      <UButton
+        label="Cancelar"
+        color="neutral"
+        variant="ghost"
+        @click="closeImport"
+      />
       <UButton
         label="Importar"
         icon="i-lucide-upload"

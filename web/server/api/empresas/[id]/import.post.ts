@@ -8,6 +8,6 @@ export default defineEventHandler(async (event) => {
   return $fetch(`${config.coreApiUrl}/empresas/${id}/import`, {
     method: 'POST',
     body,
-    headers: { 'content-type': contentType },
+    headers: { 'content-type': contentType }
   })
 })

@@ -7,6 +7,6 @@ export default defineEventHandler(async (event) => {
   return $fetch(`${config.coreApiUrl}/documentos/import`, {
     method: 'POST',
     body,
-    headers: { 'content-type': contentType },
+    headers: { 'content-type': contentType }
   })
 })
