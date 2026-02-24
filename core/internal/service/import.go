@@ -36,8 +36,15 @@ type AutoImportResult struct {
 }
 
 type UnknownEmpresa struct {
-	CNPJ        string `json:"cnpj"`
-	RazaoSocial string `json:"razao_social"`
+	CNPJ         string `json:"cnpj"`
+	RazaoSocial  string `json:"razao_social"`
+	NomeFantasia string `json:"nome_fantasia"`
+	Logradouro   string `json:"logradouro"`
+	Numero       string `json:"numero"`
+	Bairro       string `json:"bairro"`
+	CEP          string `json:"cep"`
+	Cidade       string `json:"cidade"`
+	Estado       string `json:"estado"`
 }
 
 type ImportService struct {
@@ -232,16 +239,31 @@ func (s *ImportService) ImportDocumentosAuto(ctx context.Context, files []Import
 			s.log.Warn().Str("filename", f.Filename).Str("chave", chave).Msg("import auto: empresa not found")
 			unknown++
 
-			var unkCNPJ, unkName string
+			var unkCNPJ, unkName, unkSection string
 			if doc.DestinatarioCNPJ != "" {
 				unkCNPJ = doc.DestinatarioCNPJ
 				unkName = doc.DestinatarioNome
+				unkSection = "dest"
 			} else if doc.EmitenteCNPJ != "" {
 				unkCNPJ = doc.EmitenteCNPJ
 				unkName = doc.EmitenteNome
+				unkSection = "emit"
 			}
+
 			if unkCNPJ != "" {
-				unknownMap[unkCNPJ] = UnknownEmpresa{CNPJ: unkCNPJ, RazaoSocial: unkName}
+				if _, exists := unknownMap[unkCNPJ]; !exists {
+					unknownMap[unkCNPJ] = UnknownEmpresa{
+						CNPJ:         unkCNPJ,
+						RazaoSocial:  unkName,
+						NomeFantasia: extractPartyAddressField(xmlContent, unkSection, "xFant"),
+						Logradouro:   extractPartyAddressField(xmlContent, unkSection, "xLgr"),
+						Numero:       extractPartyAddressField(xmlContent, unkSection, "nro"),
+						Bairro:       extractPartyAddressField(xmlContent, unkSection, "xBairro"),
+						CEP:          extractPartyAddressField(xmlContent, unkSection, "CEP"),
+						Cidade:       extractPartyAddressField(xmlContent, unkSection, "xMun"),
+						Estado:       extractPartyAddressField(xmlContent, unkSection, "UF"),
+					}
+				}
 			}
 
 			continue

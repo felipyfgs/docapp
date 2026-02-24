@@ -185,13 +185,27 @@ func documentTypeFromSchemaAndXML(schema, xmlContent string) string {
 		return "ct-e"
 	}
 	if strings.Contains(schemaLower, "nfe") {
-		if extractTagValue(xmlContent, "mod") == "65" {
+		mod := extractTagValue(xmlContent, "mod")
+		if mod == "" {
+			chave := extractChaveAcesso(xmlContent)
+			if len(chave) == 44 {
+				mod = chave[20:22]
+			}
+		}
+		if mod == "65" {
 			return "nfc-e"
 		}
 		return "nf-e"
 	}
 
 	mod := extractTagValue(xmlContent, "mod")
+	if mod == "" {
+		chave := extractChaveAcesso(xmlContent)
+		if len(chave) == 44 {
+			mod = chave[20:22]
+		}
+	}
+
 	switch mod {
 	case "57":
 		return "ct-e"
@@ -346,6 +360,14 @@ func extractPartyCNPJ(xmlContent, section string) string {
 		return v
 	}
 	return ""
+}
+
+func extractPartyAddressField(xmlContent, section, fieldTag string) string {
+	body := extractSectionBody(xmlContent, section)
+	if body == "" {
+		return ""
+	}
+	return extractTagValue(body, fieldTag)
 }
 
 func extractSectionBody(xmlContent, section string) string {

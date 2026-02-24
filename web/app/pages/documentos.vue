@@ -37,7 +37,17 @@ const backfilling = ref(false)
 type AutoImportResult = {
   by_empresa: Record<string, { imported: number, failed: number, errors?: string[] }>
   unknown: number
-  unknown_empresas?: { cnpj: string, razao_social: string }[]
+  unknown_empresas?: {
+    cnpj: string
+    razao_social: string
+    nome_fantasia: string
+    logradouro: string
+    numero: string
+    bairro: string
+    cep: string
+    cidade: string
+    estado: string
+  }[]
 }
 
 // Import
@@ -108,7 +118,13 @@ async function registerSelectedEmpresas() {
           body: {
             cnpj: emp.cnpj,
             razao_social: emp.razao_social || `Empresa ${emp.cnpj}`,
-            estado: 'SP', // Require a default state as it's required by the backend, could be improved but it works as a fallback
+            nome_fantasia: emp.nome_fantasia || '',
+            logradouro: emp.logradouro || '',
+            numero: emp.numero || '',
+            bairro: emp.bairro || '',
+            cep: emp.cep || '',
+            cidade: emp.cidade || '',
+            estado: emp.estado || 'SP', // Fallback
             lookback_days: 90
           }
         })
