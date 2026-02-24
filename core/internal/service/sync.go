@@ -400,6 +400,17 @@ func (s *SyncService) baixarDocsBloqueados(ctx context.Context, empresa model.Em
 		return
 	}
 
+	// Limit fallback downloads to avoid SEFAZ 656 block (max 10 per cycle)
+	limit := 10
+	if len(docs) > limit {
+		s.log.Info().
+			Uint("empresa_id", empresa.ID).
+			Int("total_docs", len(docs)).
+			Int("limit", limit).
+			Msg("fallback: limiting downloads to prevent 656 block")
+		docs = docs[:limit]
+	}
+
 	s.log.Info().
 		Uint("empresa_id", empresa.ID).
 		Int("docs", len(docs)).
