@@ -16,7 +16,7 @@ defineProps<{
       :actions="actions"
     />
 
-    <div v-if="filters.length > 0" class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar">
+    <div v-if="filters.length > 0" class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar py-1">
       <DocumentosFilterChip
         v-for="filter in filters"
         :key="filter.columnId"
