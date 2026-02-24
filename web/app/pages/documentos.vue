@@ -121,7 +121,11 @@ async function registerSelectedEmpresas() {
     if (successCount > 0) {
       toast.add({ title: `${successCount} empresa(s) cadastrada(s)`, color: 'success' })
       selectedUnknownEmpresas.value = []
-      await handleImport() // Re-import with the newly created companies
+      
+      // Delay handleImport to allow backend DB transactions to settle
+      setTimeout(async () => {
+        await handleImport()
+      }, 500)
     } else {
       toast.add({ title: 'Erro ao cadastrar empresas', color: 'error' })
     }
@@ -465,12 +469,13 @@ function downloadBlob(blob: Blob, fileName: string) {
 
     <template #footer>
       <UButton
-        label="Cancelar"
+        :label="importResult ? 'Fechar' : 'Cancelar'"
         color="neutral"
         variant="ghost"
         @click="closeImport"
       />
       <UButton
+        v-if="!importResult"
         label="Importar"
         icon="i-lucide-upload"
         :loading="importing"
