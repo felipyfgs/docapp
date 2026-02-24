@@ -98,7 +98,9 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 			Msg("nfse adn response")
 
 		if !resp.HasDocuments() {
-			if resp.StatusProcessamento == "" && len(resp.LoteDFe) == 0 {
+			if resp.StatusProcessamento == "NENHUM_DOCUMENTO_LOCALIZADO" {
+				s.log.Info().Str("cnpj", empresa.CNPJ).Msg("nfse: no more documents at ADN")
+			} else if resp.StatusProcessamento == "" {
 				bodyPreview := rawBody
 				if len(bodyPreview) > 500 {
 					bodyPreview = bodyPreview[:500] + "..."
