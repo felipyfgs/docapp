@@ -124,11 +124,16 @@ const filterColumns: ColumnConfig<DocumentoFiscal>[] = [
 
 const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
+function stripMask(s: string): string {
+  return s.replace(/[.\-/]/g, '')
+}
+
 const filtered = computed(() => {
-  const query = search.value.toLowerCase().trim()
+  const raw = search.value.toLowerCase().trim()
   let result = filteredData.value
 
-  if (query) {
+  if (raw) {
+    const query = stripMask(raw)
     result = result.filter((documento) => {
       const values = [
         documento.chave_acesso,
@@ -138,7 +143,11 @@ const filtered = computed(() => {
         documento.emitente_cnpj,
         documento.destinatario_cnpj
       ]
-      return values.some(value => value?.toLowerCase().includes(query))
+      return values.some((value) => {
+        if (!value) return false
+        const lower = value.toLowerCase()
+        return lower.includes(raw) || stripMask(lower).includes(query)
+      })
     })
   }
 
