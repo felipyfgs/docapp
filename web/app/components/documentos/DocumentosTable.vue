@@ -255,12 +255,9 @@ const columns: TableColumn<DocumentoFiscal>[] = [
     ])
   },
   {
-    accessorKey: 'destinatario_nome',
+    accessorKey: 'destinatario_cnpj',
     header: 'Destinatário',
-    cell: ({ row }) => h('div', { class: 'min-w-48' }, [
-      h('p', { class: 'font-medium text-highlighted truncate' }, row.original.destinatario_nome || '—'),
-      h('p', { class: 'text-xs text-muted truncate' }, formatCNPJ(row.original.destinatario_cnpj))
-    ])
+    cell: ({ row }) => h('span', { class: 'text-sm font-mono whitespace-nowrap' }, formatCNPJ(row.original.destinatario_cnpj) || '—')
   },
   {
     accessorKey: 'tipo_documento',
