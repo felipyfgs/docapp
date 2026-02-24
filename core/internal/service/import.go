@@ -30,8 +30,14 @@ type ImportResult struct {
 }
 
 type AutoImportResult struct {
-	ByEmpresa map[string]ImportResult `json:"by_empresa"` // keyed by empresa razao_social
-	Unknown   int                     `json:"unknown"`    // files with no matching empresa
+	ByEmpresa       map[string]ImportResult `json:"by_empresa"` // keyed by empresa razao_social
+	Unknown         int                     `json:"unknown"`    // files with no matching empresa
+	UnknownEmpresas []UnknownEmpresa        `json:"unknown_empresas,omitempty"`
+}
+
+type UnknownEmpresa struct {
+	CNPJ        string `json:"cnpj"`
+	RazaoSocial string `json:"razao_social"`
 }
 
 type ImportService struct {
@@ -199,6 +205,7 @@ func (s *ImportService) ImportDocumentosAuto(ctx context.Context, files []Import
 	}
 	grouped := map[uint]*group{}
 	unknown := 0
+	unknownMap := map[string]UnknownEmpresa{}
 
 	for _, f := range files {
 		xmlContent := string(f.Content)
@@ -224,6 +231,19 @@ func (s *ImportService) ImportDocumentosAuto(ctx context.Context, files []Import
 		if empresa == nil {
 			s.log.Warn().Str("filename", f.Filename).Str("chave", chave).Msg("import auto: empresa not found")
 			unknown++
+
+			var unkCNPJ, unkName string
+			if doc.DestinatarioCNPJ != "" {
+				unkCNPJ = doc.DestinatarioCNPJ
+				unkName = doc.DestinatarioNome
+			} else if doc.EmitenteCNPJ != "" {
+				unkCNPJ = doc.EmitenteCNPJ
+				unkName = doc.EmitenteNome
+			}
+			if unkCNPJ != "" {
+				unknownMap[unkCNPJ] = UnknownEmpresa{CNPJ: unkCNPJ, RazaoSocial: unkName}
+			}
+
 			continue
 		}
 
@@ -234,9 +254,15 @@ func (s *ImportService) ImportDocumentosAuto(ctx context.Context, files []Import
 		}
 	}
 
+	var unknownEmpresas []UnknownEmpresa
+	for _, ue := range unknownMap {
+		unknownEmpresas = append(unknownEmpresas, ue)
+	}
+
 	result := AutoImportResult{
-		ByEmpresa: make(map[string]ImportResult),
-		Unknown:   unknown,
+		ByEmpresa:       make(map[string]ImportResult),
+		Unknown:         unknown,
+		UnknownEmpresas: unknownEmpresas,
 	}
 
 	for _, g := range grouped {

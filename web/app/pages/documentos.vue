@@ -37,6 +37,7 @@ const backfilling = ref(false)
 type AutoImportResult = {
   by_empresa: Record<string, { imported: number, failed: number, errors?: string[] }>
   unknown: number
+  unknown_empresas?: { cnpj: string, razao_social: string }[]
 }
 
 // Import
@@ -45,6 +46,9 @@ const importing = ref(false)
 const importFiles = ref<File[]>([])
 const importResult = ref<AutoImportResult | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const selectedUnknownEmpresas = ref<string[]>([])
+const registeringEmpresas = ref(false)
 
 const importFileLabel = computed(() => {
   if (importFiles.value.length === 0) return 'Clique para selecionar arquivos'
@@ -84,6 +88,48 @@ function closeImport() {
   importOpen.value = false
   importFiles.value = []
   importResult.value = null
+  selectedUnknownEmpresas.value = []
+}
+
+async function registerSelectedEmpresas() {
+  if (selectedUnknownEmpresas.value.length === 0) return
+  registeringEmpresas.value = true
+
+  try {
+    const empresasToRegister = importResult.value?.unknown_empresas?.filter(
+      e => selectedUnknownEmpresas.value.includes(e.cnpj)
+    ) || []
+
+    let successCount = 0
+    for (const emp of empresasToRegister) {
+      try {
+        await $fetch('/api/empresas', {
+          method: 'POST',
+          body: {
+            cnpj: emp.cnpj,
+            razao_social: emp.razao_social || `Empresa ${emp.cnpj}`,
+            estado: 'SP', // Require a default state as it's required by the backend, could be improved but it works as a fallback
+            lookback_days: 90
+          }
+        })
+        successCount++
+      } catch (err) {
+        console.error('Failed to create empresa:', emp.cnpj, err)
+      }
+    }
+
+    if (successCount > 0) {
+      toast.add({ title: `${successCount} empresa(s) cadastrada(s)`, color: 'success' })
+      selectedUnknownEmpresas.value = []
+      await handleImport() // Re-import with the newly created companies
+    } else {
+      toast.add({ title: 'Erro ao cadastrar empresas', color: 'error' })
+    }
+  } catch {
+    toast.add({ title: 'Erro ao processar cadastro', color: 'error' })
+  } finally {
+    registeringEmpresas.value = false
+  }
 }
 
 const xmlOpen = ref(false)
@@ -380,6 +426,39 @@ function downloadBlob(blob: Blob, fileName: string) {
           <p v-if="importResult.unknown > 0" class="text-xs text-warning px-1">
             {{ importResult.unknown }} arquivo(s) sem empresa correspondente — verifique se a empresa está cadastrada.
           </p>
+
+          <div v-if="importResult.unknown_empresas && importResult.unknown_empresas.length > 0" class="mt-4 border border-default rounded-md p-3">
+            <p class="text-sm font-medium mb-2">
+              Empresas não cadastradas encontradas nos arquivos:
+            </p>
+            <div class="space-y-2 max-h-40 overflow-y-auto">
+              <div
+                v-for="emp in importResult.unknown_empresas"
+                :key="emp.cnpj"
+                class="flex items-center"
+              >
+                <input
+                  :id="emp.cnpj"
+                  v-model="selectedUnknownEmpresas"
+                  type="checkbox"
+                  :value="emp.cnpj"
+                  class="mr-2"
+                >
+                <label :for="emp.cnpj" class="text-sm">
+                  {{ emp.cnpj }} - {{ emp.razao_social || 'Sem Razão Social' }}
+                </label>
+              </div>
+            </div>
+            <UButton
+              v-if="selectedUnknownEmpresas.length > 0"
+              class="mt-3 w-full"
+              label="Cadastrar Selecionadas e Re-importar"
+              color="primary"
+              variant="outline"
+              :loading="registeringEmpresas"
+              @click="registerSelectedEmpresas"
+            />
+          </div>
         </div>
       </div>
     </template>
