@@ -162,6 +162,8 @@ func (r *DocumentoRepository) UpsertMany(ctx context.Context, docs []model.Docum
 			Set("xml_resumo = EXCLUDED.xml_resumo").
 			Set("data_emissao = EXCLUDED.data_emissao").
 			Set("search_text = EXCLUDED.search_text").
+			Set("valor_total = EXCLUDED.valor_total").
+			Set("valor_produtos = EXCLUDED.valor_produtos").
 			Set("updated_at = EXCLUDED.updated_at")
 	}
 
@@ -196,6 +198,8 @@ func (r *DocumentoRepository) UpsertMany(ctx context.Context, docs []model.Docum
 				Set("data_emissao = EXCLUDED.data_emissao").
 				Set("competencia = EXCLUDED.competencia").
 				Set("tipo_documento = EXCLUDED.tipo_documento").
+				Set("valor_total = EXCLUDED.valor_total").
+				Set("valor_produtos = EXCLUDED.valor_produtos").
 				Set("updated_at = EXCLUDED.updated_at")
 			if _, err := q.Exec(ctx); err != nil {
 				return err
@@ -317,15 +321,17 @@ func (r *DocumentoRepository) ListDocsBloqueadosSemXML(ctx context.Context, empr
 }
 
 type DocumentoStats struct {
-	Total        int `bun:"total" json:"total"`
-	XMLCompleto  int `bun:"xml_completo" json:"xml_completo"`
-	XMLResumo    int `bun:"xml_resumo" json:"xml_resumo"`
-	Manifestados int `bun:"manifestados" json:"manifestados"`
+	Total        int     `bun:"total" json:"total"`
+	XMLCompleto  int     `bun:"xml_completo" json:"xml_completo"`
+	XMLResumo    int     `bun:"xml_resumo" json:"xml_resumo"`
+	Manifestados int     `bun:"manifestados" json:"manifestados"`
+	ValorTotal   float64 `bun:"valor_total" json:"valor_total"`
 }
 
 type CompetenciaCount struct {
-	Competencia string `bun:"competencia" json:"competencia"`
-	Count       int    `bun:"count" json:"count"`
+	Competencia string  `bun:"competencia" json:"competencia"`
+	Count       int     `bun:"count" json:"count"`
+	ValorTotal  float64 `bun:"valor_total" json:"valor_total"`
 }
 
 func (r *DocumentoRepository) StatsEmpresa(ctx context.Context, empresaID uint) (*DocumentoStats, error) {
@@ -336,6 +342,7 @@ func (r *DocumentoRepository) StatsEmpresa(ctx context.Context, empresaID uint) 
 		ColumnExpr("COUNT(*) FILTER (WHERE xml_resumo = FALSE) AS xml_completo").
 		ColumnExpr("COUNT(*) FILTER (WHERE xml_resumo = TRUE) AS xml_resumo").
 		ColumnExpr("COUNT(*) FILTER (WHERE manifestacao_status IS NOT NULL) AS manifestados").
+		ColumnExpr("COALESCE(SUM(valor_total) FILTER (WHERE valor_total > 0), 0) AS valor_total").
 		Where("empresa_id = ?", empresaID).
 		Where("deleted_at IS NULL").
 		Scan(ctx, &stats)
@@ -351,6 +358,7 @@ func (r *DocumentoRepository) GroupByCompetencia(ctx context.Context, empresaID 
 		TableExpr("documentos_fiscais").
 		ColumnExpr("competencia").
 		ColumnExpr("COUNT(*) AS count").
+		ColumnExpr("COALESCE(SUM(valor_total) FILTER (WHERE valor_total > 0), 0) AS valor_total").
 		Where("empresa_id = ?", empresaID).
 		Where("deleted_at IS NULL").
 		Where("competencia IS NOT NULL AND competencia != ''").
@@ -375,6 +383,33 @@ func (r *DocumentoRepository) ListRecentes(ctx context.Context, empresaID uint, 
 		return nil, err
 	}
 	return docs, nil
+}
+
+func (r *DocumentoRepository) ListSemValor(ctx context.Context, limit int) ([]model.DocumentoFiscal, error) {
+	docs := make([]model.DocumentoFiscal, 0)
+	err := r.db.NewSelect().Model(&docs).
+		Where("df.deleted_at IS NULL").
+		Where("df.valor_total = 0").
+		Where("df.xml_resumo = FALSE").
+		Where("df.xml_object_key != ''").
+		OrderExpr("df.id ASC").
+		Limit(limit).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
+func (r *DocumentoRepository) UpdateValores(ctx context.Context, id uint, valorTotal, valorProdutos float64) error {
+	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
+		Set("valor_total = ?", valorTotal).
+		Set("valor_produtos = ?", valorProdutos).
+		Set("updated_at = ?", time.Now()).
+		Where("id = ?", id).
+		Where("deleted_at IS NULL").
+		Exec(ctx)
+	return err
 }
 
 func applyDocumentoFilters(query *bun.SelectQuery, filter DocumentoListFilter) *bun.SelectQuery {

@@ -1,0 +1,3 @@
+ALTER TABLE documentos_fiscais
+  ADD COLUMN valor_total    NUMERIC(15,2) NOT NULL DEFAULT 0,
+  ADD COLUMN valor_produtos NUMERIC(15,2) NOT NULL DEFAULT 0;

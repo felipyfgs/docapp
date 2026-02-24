@@ -122,6 +122,10 @@ function rowItems(row: Row<DocumentoFiscal>) {
   ]
 }
 
+function formatBRL(value: number): string {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
 function formatCNPJ(cnpj: string | undefined): string {
   const digits = (cnpj || '').replace(/\D/g, '')
   if (digits.length === 11) {
@@ -290,6 +294,29 @@ const columns: TableColumn<DocumentoFiscal>[] = [
       const status = row.original.manifestacao_status
       const badge = manifestacaoBadge(status)
       return h(UBadge, { variant: 'subtle', color: badge.color }, () => badge.label)
+    }
+  },
+  {
+    accessorKey: 'valor_total',
+    header: ({ column }) => {
+      const isSorted = column.getIsSorted()
+      return h(UButton, {
+        color: 'neutral',
+        variant: 'ghost',
+        label: 'Valor',
+        icon: isSorted
+          ? isSorted === 'asc'
+            ? 'i-lucide-arrow-up-narrow-wide'
+            : 'i-lucide-arrow-down-wide-narrow'
+          : 'i-lucide-arrow-up-down',
+        class: '-mx-2.5',
+        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
+      })
+    },
+    cell: ({ row }) => {
+      const v = row.original.valor_total
+      if (!v || v === 0) return h('span', { class: 'text-muted' }, '—')
+      return h('span', { class: 'font-mono text-xs' }, formatBRL(v))
     }
   },
   {

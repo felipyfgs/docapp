@@ -225,9 +225,52 @@ func (s *DocumentoService) Export(ctx context.Context, opts DocumentoExportOptio
 }
 
 func (s *DocumentoService) Backfill(ctx context.Context, limit int) (*DocumentoBackfillResult, error) {
-	_ = ctx
-	_ = limit
-	return &DocumentoBackfillResult{}, nil
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+
+	docs, err := s.repo.ListSemValor(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listing docs sem valor: %w", err)
+	}
+
+	result := &DocumentoBackfillResult{}
+
+	for i := range docs {
+		doc := &docs[i]
+		result.Processed++
+
+		if s.storage == nil || strings.TrimSpace(doc.XMLObjectKey) == "" {
+			result.Skipped++
+			continue
+		}
+
+		xmlBytes, err := s.storage.GetObject(ctx, doc.XMLObjectKey)
+		if err != nil {
+			s.log.Warn().Err(err).Uint("id", doc.ID).Msg("backfill: failed to read xml from storage")
+			result.Skipped++
+			continue
+		}
+
+		xmlContent := string(xmlBytes)
+		valorTotal := extractValorDecimal(xmlContent, "vNF")
+		valorProdutos := extractValorDecimal(xmlContent, "vProd")
+
+		if valorTotal == 0 && valorProdutos == 0 {
+			result.Skipped++
+			continue
+		}
+
+		if err := s.repo.UpdateValores(ctx, doc.ID, valorTotal, valorProdutos); err != nil {
+			s.log.Warn().Err(err).Uint("id", doc.ID).Msg("backfill: failed to update valores")
+			result.Skipped++
+			continue
+		}
+
+		result.Uploaded++
+	}
+
+	return result, nil
 }
 
 func (s *DocumentoService) loadOrGenerateDanfe(ctx context.Context, doc *model.DocumentoFiscal, xmlContent string) ([]byte, error) {

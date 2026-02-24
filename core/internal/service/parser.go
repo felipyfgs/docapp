@@ -10,6 +10,7 @@ import (
 	"io"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -40,6 +41,8 @@ type Document struct {
 	XML              string     `json:"xml"`
 	ChaveAcesso      string     `json:"chave_acesso"`
 	DataEmissao      *time.Time `json:"data_emissao,omitempty"`
+	ValorTotal       float64    `json:"valor_total"`
+	ValorProdutos    float64    `json:"valor_produtos"`
 }
 
 type retDistDFeInt struct {
@@ -105,6 +108,8 @@ func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
 				XML:              docXML,
 				ChaveAcesso:      extractChaveAcesso(docXML),
 				DataEmissao:      dataEmissao,
+				ValorTotal:       extractValorDecimal(docXML, "vNF"),
+				ValorProdutos:    extractValorDecimal(docXML, "vProd"),
 			}
 
 			resp.Documents = append(resp.Documents, doc)
@@ -555,7 +560,22 @@ func ParseNFeProcXML(xmlContent string, nsu string) Document {
 		XML:              xmlContent,
 		ChaveAcesso:      extractChaveAcesso(xmlContent),
 		DataEmissao:      dataEmissao,
+		ValorTotal:       extractValorDecimal(xmlContent, "vNF"),
+		ValorProdutos:    extractValorDecimal(xmlContent, "vProd"),
 	}
+}
+
+// extractValorDecimal extracts a decimal value from a tag like <vNF>1234.56</vNF>.
+func extractValorDecimal(xmlContent, tag string) float64 {
+	raw := strings.TrimSpace(extractTagValue(xmlContent, tag))
+	if raw == "" {
+		return 0
+	}
+	v, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0
+	}
+	return v
 }
 
 // NSUFromFilename extracts the 15-digit NSU from filenames like WS_<NSU>_<chave>.xml.

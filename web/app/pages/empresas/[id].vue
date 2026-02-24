@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { h, resolveComponent } from 'vue'
-import { VisXYContainer, VisGroupedBar, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
+import { VisXYContainer, VisGroupedBar, VisLine, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import type { TableColumn } from '@nuxt/ui'
@@ -17,7 +17,7 @@ const { data, status, refresh } = await useFetch<EmpresaOverview>(
 
 const empresa = computed(() => data.value?.empresa)
 const syncState = computed(() => data.value?.sync_state)
-const stats = computed(() => data.value?.stats ?? { total: 0, xml_completo: 0, xml_resumo: 0, manifestados: 0 })
+const stats = computed(() => data.value?.stats ?? { total: 0, xml_completo: 0, xml_resumo: 0, manifestados: 0, valor_total: 0 })
 const porCompetencia = computed(() => data.value?.documentos_por_competencia ?? [])
 const recentes = computed(() => data.value?.documentos_recentes ?? [])
 
@@ -133,12 +133,19 @@ const x = (_: CompetenciaCount, i: number) => i
 const xTicks = (i: number) => chartData.value[i]?.competencia ?? ''
 const template = (d: CompetenciaCount) => `${d.competencia}: ${d.count} docs`
 
+function formatBRL(value: number): string {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
 const statCards = computed(() => [
-  { title: 'Total de XMLs', icon: 'i-lucide-file-text', value: stats.value.total, color: 'primary' },
-  { title: 'XML Completo', icon: 'i-lucide-file-check', value: stats.value.xml_completo, color: 'success' },
-  { title: 'XML Resumo', icon: 'i-lucide-file-warning', value: stats.value.xml_resumo, color: 'warning' },
-  { title: 'Manifestados', icon: 'i-lucide-shield-check', value: stats.value.manifestados, color: 'info' }
+  { title: 'Total de XMLs', icon: 'i-lucide-file-text', value: String(stats.value.total), color: 'primary' },
+  { title: 'XML Completo', icon: 'i-lucide-file-check', value: String(stats.value.xml_completo), color: 'success' },
+  { title: 'XML Resumo', icon: 'i-lucide-file-warning', value: String(stats.value.xml_resumo), color: 'warning' },
+  { title: 'Manifestados', icon: 'i-lucide-shield-check', value: String(stats.value.manifestados), color: 'info' },
+  { title: 'Valor Total', icon: 'i-lucide-circle-dollar-sign', value: formatBRL(stats.value.valor_total ?? 0), color: 'success' }
 ])
+
+const hasValorData = computed(() => porCompetencia.value.some(d => d.valor_total > 0))
 
 function tipoColor(tipo: string) {
   const m: Record<string, string> = { 'nf-e': 'primary', 'nfc-e': 'success', 'ct-e': 'warning', 'nfs-e': 'neutral' }
@@ -186,6 +193,15 @@ const tableColumns: TableColumn<DocumentoFiscal>[] = [
     id: 'xml_resumo',
     header: 'XML',
     cell: ({ row }) => h(UBadge, { color: row.original.xml_resumo ? 'warning' : 'success', variant: 'subtle', size: 'xs' }, () => row.original.xml_resumo ? 'Resumo' : 'Completo')
+  },
+  {
+    accessorKey: 'valor_total',
+    header: 'Valor',
+    cell: ({ row }) => {
+      const v = row.original.valor_total
+      if (!v || v === 0) return h('span', { class: 'text-muted' }, '—')
+      return h('span', { class: 'font-mono text-xs' }, formatBRL(v))
+    }
   }
 ]
 </script>
@@ -363,24 +379,24 @@ const tableColumns: TableColumn<DocumentoFiscal>[] = [
           <!-- Right Column: Stats and Lists -->
           <div class="lg:col-span-2 space-y-6">
             <!-- Stats Cards -->
-            <UPageGrid class="grid-cols-2 lg:grid-cols-4">
+            <UPageGrid class="grid-cols-2 lg:grid-cols-5">
               <UPageCard
                 v-for="stat in statCards"
                 :key="stat.title"
                 :title="stat.title"
-                :description="String(stat.value)"
+                :description="stat.value"
                 :icon="stat.icon"
                 variant="soft"
                 :ui="{
                   wrapper: 'items-start',
                   title: 'text-xs text-muted uppercase font-medium',
-                  description: 'text-2xl font-bold text-highlighted mt-1',
+                  description: 'text-xl font-bold text-highlighted mt-1',
                   leadingIcon: `text-${stat.color} size-8`
                 }"
               />
             </UPageGrid>
 
-            <!-- Chart -->
+            <!-- Bar chart: volume por competência -->
             <UCard v-if="porCompetencia.length > 0">
               <template #header>
                 <div class="flex items-center gap-2">
@@ -394,11 +410,37 @@ const tableColumns: TableColumn<DocumentoFiscal>[] = [
               <VisXYContainer
                 :data="chartData"
                 :padding="{ top: 20, left: 8, right: 8 }"
-                class="h-56"
+                class="h-48"
               >
                 <VisGroupedBar :x="x" :y="[(d: CompetenciaCount) => d.count]" color="['var(--ui-primary)']" />
                 <VisAxis type="x" :x="x" :tick-format="xTicks" />
                 <VisCrosshair color="var(--ui-primary)" :template="template" />
+                <VisTooltip />
+              </VisXYContainer>
+            </UCard>
+
+            <!-- Line chart: valor por competência -->
+            <UCard v-if="hasValorData">
+              <template #header>
+                <div class="flex items-center gap-2">
+                  <UIcon name="i-lucide-trending-up" class="size-5 text-success" />
+                  <h3 class="font-semibold text-highlighted">
+                    Valor Total por Competência
+                  </h3>
+                </div>
+              </template>
+
+              <VisXYContainer
+                :data="chartData"
+                :padding="{ top: 20, left: 8, right: 8 }"
+                class="h-48"
+              >
+                <VisLine :x="x" :y="(d: CompetenciaCount) => d.valor_total" color="var(--ui-color-success-500)" />
+                <VisAxis type="x" :x="x" :tick-format="xTicks" />
+                <VisCrosshair
+                  color="var(--ui-color-success-500)"
+                  :template="(d: CompetenciaCount) => `${d.competencia}: ${formatBRL(d.valor_total)}`"
+                />
                 <VisTooltip />
               </VisXYContainer>
             </UCard>

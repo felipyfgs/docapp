@@ -113,6 +113,8 @@ export interface DocumentoFiscal {
   manifestacao_status?: string
   manifestacao_at?: string
   created_at: string
+  valor_total?: number
+  valor_produtos?: number
 }
 
 export interface DocumentoListResponse {
@@ -155,11 +157,13 @@ export interface EmpresaDocumentoStats {
   xml_completo: number
   xml_resumo: number
   manifestados: number
+  valor_total: number
 }
 
 export interface CompetenciaCount {
   competencia: string
   count: number
+  valor_total: number
 }
 
 export interface EmpresaOverview {

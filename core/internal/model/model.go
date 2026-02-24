@@ -151,4 +151,6 @@ type DocumentoFiscal struct {
 	SearchText         string     `bun:"search_text,notnull" json:"-"`
 	ManifestacaoStatus string     `bun:"manifestacao_status,nullzero" json:"manifestacao_status"`
 	ManifestacaoAt     *time.Time `bun:"manifestacao_at,nullzero" json:"manifestacao_at"`
+	ValorTotal         float64    `bun:"valor_total" json:"valor_total"`
+	ValorProdutos      float64    `bun:"valor_produtos" json:"valor_produtos"`
 }

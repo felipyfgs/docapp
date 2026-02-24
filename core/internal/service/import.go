@@ -173,6 +173,8 @@ func (s *ImportService) ImportDocumentos(ctx context.Context, empresa model.Empr
 			XMLResumo:        false,
 			DataEmissao:      doc.DataEmissao,
 			SearchText:       searchText,
+			ValorTotal:       doc.ValorTotal,
+			ValorProdutos:    doc.ValorProdutos,
 		})
 
 		if len(batch) >= importBatchSize {
