@@ -34,6 +34,8 @@ const search = defineModel<string>('search', { default: '' })
 const tipoFilter = defineModel<string>('tipoFilter', { default: 'all' })
 const statusFilter = defineModel<string>('statusFilter', { default: 'all' })
 const resumoFilter = defineModel<string>('resumoFilter', { default: 'all' })
+const competenciaFilter = defineModel<string>('competenciaFilter', { default: 'all' })
+const manifestacaoFilter = defineModel<string>('manifestacaoFilter', { default: 'all' })
 
 const filtered = computed(() => {
   const query = search.value.toLowerCase().trim()
@@ -70,7 +72,22 @@ const filtered = computed(() => {
     result = result.filter(documento => !documento.xml_resumo)
   }
 
+  if (competenciaFilter.value !== 'all') {
+    result = result.filter(documento => documento.competencia === competenciaFilter.value)
+  }
+
+  if (manifestacaoFilter.value === 'pendente') {
+    result = result.filter(documento => !documento.manifestacao_status)
+  } else if (manifestacaoFilter.value !== 'all') {
+    result = result.filter(documento => documento.manifestacao_status === manifestacaoFilter.value)
+  }
+
   return result
+})
+
+const competenciaOptions = computed(() => {
+  const all = [...new Set((props.data ?? []).map(d => d.competencia).filter(Boolean))]
+  return all.sort().reverse().map(c => ({ label: c, value: c }))
 })
 
 const selectedRows = computed((): DocumentoFiscal[] => {
@@ -365,6 +382,29 @@ function getVisibilityItems() {
         :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
         placeholder="XML"
         class="min-w-48"
+      />
+
+      <USelect
+        v-model="competenciaFilter"
+        :items="[{ label: 'Todas as competências', value: 'all' }, ...competenciaOptions]"
+        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+        placeholder="Competência"
+        class="min-w-44"
+      />
+
+      <USelect
+        v-model="manifestacaoFilter"
+        :items="[
+          { label: 'Todas as manifestações', value: 'all' },
+          { label: 'Ciência', value: 'ciencia' },
+          { label: 'Confirmada', value: 'confirmada' },
+          { label: 'Desconhecida', value: 'desconhecida' },
+          { label: 'Não Realizada', value: 'nao_realizada' },
+          { label: 'Pendente', value: 'pendente' }
+        ]"
+        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+        placeholder="Manifestação"
+        class="min-w-44"
       />
 
       <UDropdownMenu

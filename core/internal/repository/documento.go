@@ -40,8 +40,8 @@ func (r *DocumentoRepository) List(ctx context.Context, filter DocumentoListFilt
 	if pageSize <= 0 {
 		pageSize = 20
 	}
-	if pageSize > 200 {
-		pageSize = 200
+	if pageSize > 2000 {
+		pageSize = 2000
 	}
 
 	countQuery := r.db.NewSelect().Model((*model.DocumentoFiscal)(nil)).Where("df.deleted_at IS NULL")
