@@ -132,6 +132,9 @@ const selectedRows = computed((): DocumentoFiscal[] => {
   return table.value.tableApi.getFilteredSelectedRowModel().rows.map((row: Row<DocumentoFiscal>) => row.original)
 })
 
+const totalFilteredRows = computed(() => table.value?.tableApi?.getFilteredRowModel().rows.length ?? 0)
+const totalSelectedRows = computed(() => table.value?.tableApi?.getFilteredSelectedRowModel().rows.length ?? 0)
+
 defineExpose({ selectedRows, tableApi: computed(() => table.value?.tableApi) })
 
 function rowItems(row: Row<DocumentoFiscal>) {
@@ -452,36 +455,38 @@ function getVisibilityItems() {
     }"
   />
 
-  <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-    <div class="flex items-center gap-3 text-sm text-muted">
-      <span>
-        {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} de
-        {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} linha(s) selecionada(s).
-      </span>
+  <ClientOnly>
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
+      <div class="flex items-center gap-3 text-sm text-muted">
+        <span>
+          {{ totalSelectedRows }} de
+          {{ totalFilteredRows }} linha(s) selecionada(s).
+        </span>
 
-      <div class="flex items-center gap-1.5">
-        <span>Linhas</span>
-        <USelect
-          :model-value="String(pagination.pageSize)"
-          :items="[
-            { label: '10', value: '10' },
-            { label: '15', value: '15' },
-            { label: '25', value: '25' },
-            { label: '50', value: '50' },
-            { label: '100', value: '100' },
-            { label: '200', value: '200' }
-          ]"
-          class="w-20"
-          @update:model-value="(val: string) => { pagination.pageSize = Number(val); pagination.pageIndex = 0 }"
-        />
+        <div class="flex items-center gap-1.5">
+          <span>Linhas</span>
+          <USelect
+            :model-value="String(pagination.pageSize)"
+            :items="[
+              { label: '10', value: '10' },
+              { label: '15', value: '15' },
+              { label: '25', value: '25' },
+              { label: '50', value: '50' },
+              { label: '100', value: '100' },
+              { label: '200', value: '200' }
+            ]"
+            class="w-20"
+            @update:model-value="(val: string) => { pagination.pageSize = Number(val); pagination.pageIndex = 0 }"
+          />
+        </div>
       </div>
-    </div>
 
-    <UPagination
-      :page="pagination.pageIndex + 1"
-      :items-per-page="pagination.pageSize"
-      :total="table?.tableApi?.getFilteredRowModel().rows.length || 0"
-      @update:page="(page: number) => { pagination.pageIndex = page - 1 }"
-    />
-  </div>
+      <UPagination
+        :page="pagination.pageIndex + 1"
+        :items-per-page="pagination.pageSize"
+        :total="totalFilteredRows"
+        @update:page="(page: number) => { pagination.pageIndex = page - 1 }"
+      />
+    </div>
+  </ClientOnly>
 </template>
