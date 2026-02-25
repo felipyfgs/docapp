@@ -36,6 +36,7 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 
 	r.Route("/documentos", func(r chi.Router) {
 		r.Get("/", documento.List)
+		r.Get("/dashboard", documento.Dashboard)
 		r.Get("/{id}/xml", documento.XML)
 		r.Post("/import", documento.Import)
 		r.Post("/export", documento.Export)

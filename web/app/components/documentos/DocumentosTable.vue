@@ -91,6 +91,21 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
 
 const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
+const route = useRoute()
+const initialFilterApplied = ref(false)
+
+watch(() => props.data, (data) => {
+  if (initialFilterApplied.value || !data?.length) return
+  const filterParam = route.query.filter as string | undefined
+  if (filterParam) {
+    const [columnId, value] = filterParam.split(':')
+    if (columnId && value) {
+      filterActions.addFilterValue(columnId, value)
+    }
+  }
+  initialFilterApplied.value = true
+}, { immediate: true })
+
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
   if (!q) return filteredData.value

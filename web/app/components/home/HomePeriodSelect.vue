@@ -8,32 +8,36 @@ const props = defineProps<{
   range: Range
 }>()
 
+const periodLabels: Record<Period, string> = {
+  daily: 'Diário',
+  weekly: 'Semanal',
+  monthly: 'Mensal'
+}
+
 const days = computed(() => eachDayOfInterval(props.range))
 
-const periods = computed<Period[]>(() => {
+const periods = computed(() => {
   if (days.value.length <= 8) {
-    return [
-      'daily'
-    ]
+    return [{ label: periodLabels.daily, value: 'daily' as Period }]
   }
 
   if (days.value.length <= 31) {
     return [
-      'daily',
-      'weekly'
+      { label: periodLabels.daily, value: 'daily' as Period },
+      { label: periodLabels.weekly, value: 'weekly' as Period }
     ]
   }
 
   return [
-    'weekly',
-    'monthly'
+    { label: periodLabels.weekly, value: 'weekly' as Period },
+    { label: periodLabels.monthly, value: 'monthly' as Period }
   ]
 })
 
-// Ensure the model value is always a valid period
 watch(periods, () => {
-  if (!periods.value.includes(model.value)) {
-    model.value = periods.value[0]!
+  const validValues = periods.value.map(p => p.value)
+  if (!validValues.includes(model.value)) {
+    model.value = validValues[0]!
   }
 })
 </script>
@@ -44,6 +48,6 @@ watch(periods, () => {
     :items="periods"
     variant="ghost"
     class="data-[state=open]:bg-elevated"
-    :ui="{ value: 'capitalize', itemLabel: 'capitalize', trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
+    :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
   />
 </template>

@@ -59,6 +59,31 @@ export interface Range {
   end: Date
 }
 
+export interface DashboardStats {
+  total_documentos: number
+  total_empresas: number
+  valor_total: number
+  pendentes_manifestacao: number
+}
+
+export interface DashboardPeriodStats {
+  total_documentos: number
+  valor_total: number
+}
+
+export interface DashboardChartPoint {
+  date: string
+  count: number
+  valor_total: number
+}
+
+export interface DashboardResponse {
+  stats: DashboardStats
+  previous_stats: DashboardPeriodStats
+  chart: DashboardChartPoint[] | null
+  recentes: DocumentoFiscal[] | null
+}
+
 export interface Empresa {
   id: number
   cnpj: string

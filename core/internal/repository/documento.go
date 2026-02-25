@@ -412,6 +412,104 @@ func (r *DocumentoRepository) UpdateValores(ctx context.Context, id uint, valorT
 	return err
 }
 
+type DashboardStats struct {
+	TotalDocumentos      int     `bun:"total_documentos" json:"total_documentos"`
+	TotalEmpresas        int     `bun:"total_empresas" json:"total_empresas"`
+	ValorTotal           float64 `bun:"valor_total" json:"valor_total"`
+	PendentesManifestacao int    `bun:"pendentes_manifestacao" json:"pendentes_manifestacao"`
+}
+
+type DashboardPeriodStats struct {
+	TotalDocumentos int     `bun:"total_documentos" json:"total_documentos"`
+	ValorTotal      float64 `bun:"valor_total" json:"valor_total"`
+}
+
+type DashboardChartPoint struct {
+	Date       string  `bun:"date" json:"date"`
+	Count      int     `bun:"count" json:"count"`
+	ValorTotal float64 `bun:"valor_total" json:"valor_total"`
+}
+
+func (r *DocumentoRepository) DashboardStats(ctx context.Context, from, to time.Time) (*DashboardStats, error) {
+	var stats DashboardStats
+	err := r.db.NewSelect().
+		TableExpr("documentos_fiscais AS df").
+		ColumnExpr("COUNT(*) AS total_documentos").
+		ColumnExpr("COUNT(DISTINCT df.empresa_id) AS total_empresas").
+		ColumnExpr("COALESCE(SUM(df.valor_total) FILTER (WHERE df.valor_total > 0), 0) AS valor_total").
+		ColumnExpr("COUNT(*) FILTER (WHERE df.xml_resumo = TRUE AND df.manifestacao_status IS NULL AND df.chave_acesso IS NOT NULL AND df.chave_acesso != '') AS pendentes_manifestacao").
+		Where("df.deleted_at IS NULL").
+		Where("df.data_emissao >= ?", from).
+		Where("df.data_emissao <= ?", to).
+		Scan(ctx, &stats)
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+func (r *DocumentoRepository) DashboardPreviousPeriodStats(ctx context.Context, from, to time.Time) (*DashboardPeriodStats, error) {
+	var stats DashboardPeriodStats
+	err := r.db.NewSelect().
+		TableExpr("documentos_fiscais AS df").
+		ColumnExpr("COUNT(*) AS total_documentos").
+		ColumnExpr("COALESCE(SUM(df.valor_total) FILTER (WHERE df.valor_total > 0), 0) AS valor_total").
+		Where("df.deleted_at IS NULL").
+		Where("df.data_emissao >= ?", from).
+		Where("df.data_emissao <= ?", to).
+		Scan(ctx, &stats)
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+func (r *DocumentoRepository) DashboardChart(ctx context.Context, from, to time.Time, groupBy string) ([]DashboardChartPoint, error) {
+	var truncExpr string
+	switch groupBy {
+	case "weekly":
+		truncExpr = "date_trunc('week', df.data_emissao)::date"
+	case "monthly":
+		truncExpr = "date_trunc('month', df.data_emissao)::date"
+	default:
+		truncExpr = "df.data_emissao::date"
+	}
+
+	var result []DashboardChartPoint
+	err := r.db.NewSelect().
+		TableExpr("documentos_fiscais AS df").
+		ColumnExpr(truncExpr+" AS date").
+		ColumnExpr("COUNT(*) AS count").
+		ColumnExpr("COALESCE(SUM(df.valor_total) FILTER (WHERE df.valor_total > 0), 0) AS valor_total").
+		Where("df.deleted_at IS NULL").
+		Where("df.data_emissao >= ?", from).
+		Where("df.data_emissao <= ?", to).
+		Where("df.data_emissao IS NOT NULL").
+		GroupExpr(truncExpr).
+		OrderExpr(truncExpr+" ASC").
+		Scan(ctx, &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *DocumentoRepository) DashboardRecentes(ctx context.Context, limit int) ([]model.DocumentoFiscal, error) {
+	docs := make([]model.DocumentoFiscal, 0)
+	err := r.db.NewSelect().Model(&docs).
+		Relation("Empresa", func(q *bun.SelectQuery) *bun.SelectQuery {
+			return q.Where(`"empresa".deleted_at IS NULL`)
+		}).
+		Where("df.deleted_at IS NULL").
+		OrderExpr("df.data_emissao DESC NULLS LAST, df.created_at DESC").
+		Limit(limit).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
 func applyDocumentoFilters(query *bun.SelectQuery, filter DocumentoListFilter) *bun.SelectQuery {
 	if filter.EmpresaID > 0 {
 		query = query.Where("df.empresa_id = ?", filter.EmpresaID)

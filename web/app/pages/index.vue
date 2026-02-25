@@ -1,69 +1,61 @@
 <script setup lang="ts">
-import { sub } from 'date-fns'
-import type { DropdownMenuItem } from '@nuxt/ui'
-import type { Period, Range } from '~/types'
-
-const { isNotificationsSlideoverOpen } = useDashboard()
-
-const items = [[{
-  label: 'New mail',
-  icon: 'i-lucide-send',
-  to: '/inbox'
-}, {
-  label: 'New customer',
-  icon: 'i-lucide-user-plus',
-  to: '/customers'
-}]] satisfies DropdownMenuItem[][]
+import { sub, format } from 'date-fns'
+import type { Period, Range, DashboardResponse } from '~/types'
 
 const range = shallowRef<Range>({
-  start: sub(new Date(), { days: 14 }),
+  start: sub(new Date(), { days: 30 }),
   end: new Date()
 })
 const period = ref<Period>('daily')
+
+const queryParams = computed(() => ({
+  from: format(range.value.start, 'yyyy-MM-dd'),
+  to: format(range.value.end, 'yyyy-MM-dd'),
+  group_by: period.value
+}))
+
+const { data, status, refresh } = await useFetch<DashboardResponse>('/api/dashboard', {
+  lazy: true,
+  query: queryParams
+})
 </script>
 
 <template>
   <UDashboardPanel id="home">
     <template #header>
-      <UDashboardNavbar title="Home" :ui="{ right: 'gap-3' }">
+      <UDashboardNavbar title="Dashboard">
         <template #leading>
           <UDashboardSidebarCollapse />
-        </template>
-
-        <template #right>
-          <UTooltip text="Notifications" :shortcuts="['N']">
-            <UButton
-              color="neutral"
-              variant="ghost"
-              square
-              @click="isNotificationsSlideoverOpen = true"
-            >
-              <UChip color="error" inset>
-                <UIcon name="i-lucide-bell" class="size-5 shrink-0" />
-              </UChip>
-            </UButton>
-          </UTooltip>
-
-          <UDropdownMenu :items="items">
-            <UButton icon="i-lucide-plus" size="md" class="rounded-full" />
-          </UDropdownMenu>
         </template>
       </UDashboardNavbar>
 
       <UDashboardToolbar>
         <template #left>
-          <!-- NOTE: The `-ms-1` class is used to align with the `DashboardSidebarCollapse` button here. -->
           <HomeDateRangePicker v-model="range" class="-ms-1" />
-
           <HomePeriodSelect v-model="period" :range="range" />
         </template>
       </UDashboardToolbar>
     </template>
 
     <template #body>
-      <HomeStats :period="period" :range="range" />
-      <HomeChart :period="period" :range="range" />
-      <HomeSales :period="period" :range="range" />
+      <div v-if="status === 'pending'" class="flex items-center justify-center py-20">
+        <UIcon name="i-lucide-loader-2" class="size-6 animate-spin text-muted" />
+      </div>
+      <div v-else-if="status === 'error'" class="flex flex-col items-center justify-center gap-3 py-20">
+        <UIcon name="i-lucide-circle-alert" class="size-8 text-muted" />
+        <p class="text-sm text-muted">
+          Erro ao carregar dados do dashboard.
+        </p>
+        <UButton label="Tentar novamente" variant="outline" color="neutral" icon="i-lucide-refresh-cw" @click="refresh()" />
+      </div>
+      <template v-else>
+        <HomeStats :stats="data?.stats ?? null" />
+        <HomeChart
+          :data="data?.chart ?? null"
+          :period="period"
+        />
+        <HomeSales :data="data?.recentes ?? null" />
+      </template>
     </template>
   </UDashboardPanel>
 </template>

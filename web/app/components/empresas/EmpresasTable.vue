@@ -28,7 +28,7 @@ const columnFilters = ref<{ id: string, value: string }[]>([])
 const columnVisibility = ref<Record<string, boolean>>({})
 const rowSelection = ref<Record<string, boolean>>({})
 
-const pagination = ref({ pageIndex: 0, pageSize: 10 })
+const pagination = ref({ pageIndex: 0, pageSize: 15 })
 
 const search = defineModel<string>('search', { default: '' })
 
@@ -75,6 +75,21 @@ const filterColumns = computed<ColumnConfig<Empresa>[]>(() => [
 ])
 
 const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
+
+const route = useRoute()
+const initialFilterApplied = ref(false)
+
+watch(() => props.data, (data) => {
+  if (initialFilterApplied.value || !data?.length) return
+  const filterParam = route.query.filter as string | undefined
+  if (filterParam) {
+    const [columnId, value] = filterParam.split(':')
+    if (columnId && value) {
+      filterActions.addFilterValue(columnId, value)
+    }
+  }
+  initialFilterApplied.value = true
+}, { immediate: true })
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
@@ -246,17 +261,15 @@ const columns: TableColumn<Empresa>[] = [
     enableHiding: false,
     meta: { class: { td: 'text-right' } },
     cell: ({ row }) =>
-      h('div', { class: 'text-right' },
-        h(UDropdownMenu, {
-          content: { align: 'end' },
-          items: rowItems(row)
-        }, () => h(UButton, {
-          icon: 'i-lucide-ellipsis-vertical',
-          color: 'neutral',
-          variant: 'ghost',
-          class: 'ml-auto'
-        }))
-      )
+      h(UDropdownMenu, {
+        content: { align: 'end' },
+        items: rowItems(row)
+      }, () => h(UButton, {
+        icon: 'i-lucide-ellipsis-vertical',
+        color: 'neutral',
+        variant: 'ghost',
+        class: 'ml-auto'
+      }))
   }
 ]
 
@@ -338,7 +351,8 @@ const columnLabels: Record<string, string> = {
               { label: '15', value: '15' },
               { label: '25', value: '25' },
               { label: '50', value: '50' },
-              { label: '100', value: '100' }
+              { label: '100', value: '100' },
+              { label: '200', value: '200' }
             ]"
             class="w-20"
             @update:model-value="(val: string) => { pagination = { pageIndex: 0, pageSize: Number(val) } }"

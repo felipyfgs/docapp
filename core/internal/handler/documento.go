@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"docapp/core/internal/repository"
 	"docapp/core/internal/service"
@@ -18,6 +19,7 @@ import (
 type DocumentoHandler struct {
 	svc           *service.DocumentoService
 	importService *service.ImportService
+	docRepo       *repository.DocumentoRepository
 	log           zerolog.Logger
 }
 
@@ -32,8 +34,8 @@ type backfillRequest struct {
 	Limit int `json:"limit"`
 }
 
-func NewDocumentoHandler(svc *service.DocumentoService, importService *service.ImportService, log zerolog.Logger) *DocumentoHandler {
-	return &DocumentoHandler{svc: svc, importService: importService, log: log}
+func NewDocumentoHandler(svc *service.DocumentoService, importService *service.ImportService, docRepo *repository.DocumentoRepository, log zerolog.Logger) *DocumentoHandler {
+	return &DocumentoHandler{svc: svc, importService: importService, docRepo: docRepo, log: log}
 }
 
 func (h *DocumentoHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -225,6 +227,72 @@ func (h *DocumentoHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	result := h.importService.ImportDocumentosAuto(r.Context(), allFiles)
 	writeJSONDoc(w, http.StatusOK, result)
+}
+
+func (h *DocumentoHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
+	fromStr := strings.TrimSpace(r.URL.Query().Get("from"))
+	toStr := strings.TrimSpace(r.URL.Query().Get("to"))
+	groupBy := strings.TrimSpace(r.URL.Query().Get("group_by"))
+
+	if fromStr == "" || toStr == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Parâmetros 'from' e 'to' são obrigatórios (YYYY-MM-DD)."})
+		return
+	}
+
+	from, err := time.Parse("2006-01-02", fromStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Formato de data 'from' inválido. Use YYYY-MM-DD."})
+		return
+	}
+
+	to, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Formato de data 'to' inválido. Use YYYY-MM-DD."})
+		return
+	}
+
+	to = to.Add(24*time.Hour - time.Second)
+
+	if groupBy == "" {
+		groupBy = "daily"
+	}
+
+	ctx := r.Context()
+
+	stats, err := h.docRepo.DashboardStats(ctx, from, to)
+	if err != nil {
+		h.log.Error().Err(err).Msg("dashboard stats failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao calcular estatísticas."})
+		return
+	}
+
+	duration := to.Sub(from)
+	prevTo := from.Add(-time.Second)
+	prevFrom := prevTo.Add(-duration)
+	prevStats, err := h.docRepo.DashboardPreviousPeriodStats(ctx, prevFrom, prevTo)
+	if err != nil {
+		h.log.Error().Err(err).Msg("dashboard previous period stats failed")
+		prevStats = &repository.DashboardPeriodStats{}
+	}
+
+	chart, err := h.docRepo.DashboardChart(ctx, from, to, groupBy)
+	if err != nil {
+		h.log.Error().Err(err).Msg("dashboard chart failed")
+		chart = nil
+	}
+
+	recentes, err := h.docRepo.DashboardRecentes(ctx, 10)
+	if err != nil {
+		h.log.Error().Err(err).Msg("dashboard recentes failed")
+		recentes = nil
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"stats":          stats,
+		"previous_stats": prevStats,
+		"chart":          chart,
+		"recentes":       recentes,
+	})
 }
 
 func writeJSONDoc(w http.ResponseWriter, status int, v any) {
