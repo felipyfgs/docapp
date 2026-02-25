@@ -19,6 +19,7 @@ import (
 type DocumentoHandler struct {
 	svc           *service.DocumentoService
 	importService *service.ImportService
+	syncService   *service.SyncService
 	docRepo       *repository.DocumentoRepository
 	log           zerolog.Logger
 }
@@ -34,8 +35,8 @@ type backfillRequest struct {
 	Limit int `json:"limit"`
 }
 
-func NewDocumentoHandler(svc *service.DocumentoService, importService *service.ImportService, docRepo *repository.DocumentoRepository, log zerolog.Logger) *DocumentoHandler {
-	return &DocumentoHandler{svc: svc, importService: importService, docRepo: docRepo, log: log}
+func NewDocumentoHandler(svc *service.DocumentoService, importService *service.ImportService, syncService *service.SyncService, docRepo *repository.DocumentoRepository, log zerolog.Logger) *DocumentoHandler {
+	return &DocumentoHandler{svc: svc, importService: importService, syncService: syncService, docRepo: docRepo, log: log}
 }
 
 func (h *DocumentoHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -293,6 +294,49 @@ func (h *DocumentoHandler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"chart":          chart,
 		"recentes":       recentes,
 	})
+}
+
+type manifestarRequest struct {
+	IDs           []uint `json:"ids"`
+	TipoEvento    string `json:"tipo_evento"`
+	Justificativa string `json:"justificativa"`
+}
+
+func (h *DocumentoHandler) Manifestar(w http.ResponseWriter, r *http.Request) {
+	var req manifestarRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Payload inválido."})
+		return
+	}
+
+	if len(req.IDs) == 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Nenhum documento selecionado."})
+		return
+	}
+
+	validEvents := map[string]bool{"210210": true, "210200": true, "210220": true, "210240": true}
+	if !validEvents[req.TipoEvento] {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Tipo de evento inválido."})
+		return
+	}
+
+	if req.TipoEvento == "210240" && strings.TrimSpace(req.Justificativa) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Justificativa é obrigatória para 'Operação Não Realizada'."})
+		return
+	}
+
+	result, err := h.syncService.ManifestarEmLote(r.Context(), service.ManifestacaoRequest{
+		IDs:           req.IDs,
+		TipoEvento:    req.TipoEvento,
+		Justificativa: req.Justificativa,
+	})
+	if err != nil {
+		h.log.Error().Err(err).Msg("manifestar em lote failed")
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }
 
 func writeJSONDoc(w http.ResponseWriter, status int, v any) {

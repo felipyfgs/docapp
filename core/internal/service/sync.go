@@ -548,6 +548,133 @@ func (s *SyncService) computeThrottleBlock(empresa model.Empresa) time.Duration 
 }
 
 
+type ManifestacaoRequest struct {
+	IDs           []uint
+	TipoEvento    string
+	Justificativa string
+}
+
+type ManifestacaoResultItem struct {
+	ID     uint   `json:"id"`
+	Chave  string `json:"chave_acesso"`
+	Status string `json:"status"`
+	CStat  string `json:"cstat,omitempty"`
+	Erro   string `json:"erro,omitempty"`
+}
+
+type ManifestacaoResult struct {
+	Total     int                      `json:"total"`
+	Sucesso   int                      `json:"sucesso"`
+	Erros     int                      `json:"erros"`
+	Resultados []ManifestacaoResultItem `json:"resultados"`
+}
+
+func (s *SyncService) ManifestarEmLote(ctx context.Context, req ManifestacaoRequest) (*ManifestacaoResult, error) {
+	statusMap := map[string]string{
+		"210210": "ciencia",
+		"210200": "confirmada",
+		"210220": "desconhecida",
+		"210240": "nao_realizada",
+	}
+
+	manifestacaoStatus, ok := statusMap[req.TipoEvento]
+	if !ok {
+		return nil, fmt.Errorf("tipo de evento inválido: %s", req.TipoEvento)
+	}
+
+	if len(req.IDs) == 0 {
+		return nil, fmt.Errorf("nenhum documento selecionado")
+	}
+
+	docs, err := s.documentoRepo.ListByIDs(ctx, req.IDs)
+	if err != nil {
+		return nil, fmt.Errorf("listando documentos: %w", err)
+	}
+
+	empresaCache := make(map[uint]*model.Empresa)
+
+	result := &ManifestacaoResult{
+		Total:      len(docs),
+		Resultados: make([]ManifestacaoResultItem, 0, len(docs)),
+	}
+
+	for _, doc := range docs {
+		item := ManifestacaoResultItem{
+			ID:    doc.ID,
+			Chave: doc.ChaveAcesso,
+		}
+
+		if doc.ChaveAcesso == "" {
+			item.Status = "erro"
+			item.Erro = "documento sem chave de acesso"
+			result.Erros++
+			result.Resultados = append(result.Resultados, item)
+			continue
+		}
+
+		empresa, exists := empresaCache[doc.EmpresaID]
+		if !exists {
+			empresa, err = s.empresaRepo.GetByID(ctx, doc.EmpresaID)
+			if err != nil {
+				item.Status = "erro"
+				item.Erro = "empresa não encontrada"
+				result.Erros++
+				result.Resultados = append(result.Resultados, item)
+				continue
+			}
+			empresaCache[doc.EmpresaID] = empresa
+		}
+
+		if len(empresa.CertificadoPFX) == 0 {
+			item.Status = "erro"
+			item.Erro = "empresa sem certificado"
+			result.Erros++
+			result.Resultados = append(result.Resultados, item)
+			continue
+		}
+
+		siglaUF := normalizeSiglaUF(firstNonEmpty(empresa.SiglaUF, empresa.Estado))
+
+		manifResp, err := s.client.Manifesta(
+			ctx,
+			empresa.CertificadoPFX,
+			empresa.CertificadoSenha,
+			empresa.CNPJ,
+			empresa.RazaoSocial,
+			siglaUF,
+			empresa.TpAmb,
+			doc.ChaveAcesso,
+			req.TipoEvento,
+			req.Justificativa,
+		)
+		if err != nil {
+			item.Status = "erro"
+			item.Erro = err.Error()
+			result.Erros++
+			result.Resultados = append(result.Resultados, item)
+			continue
+		}
+
+		cStat := firstNonEmpty(manifResp.CStat)
+		item.CStat = cStat
+
+		if cStat == "128" || cStat == "135" || cStat == "573" {
+			_ = s.documentoRepo.UpdateManifestacaoStatus(ctx, doc.ID, manifestacaoStatus, time.Now())
+			item.Status = "sucesso"
+			result.Sucesso++
+		} else {
+			item.Status = "erro"
+			item.Erro = manifResp.XMotivo
+			result.Erros++
+		}
+
+		result.Resultados = append(result.Resultados, item)
+		sleepWithJitter(1, 2)
+	}
+
+	return result, nil
+}
+
 func buildDocumentSearchText(empresaCNPJ string, d Document) string {
 	parts := []string{
 		empresaCNPJ,

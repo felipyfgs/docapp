@@ -41,6 +41,7 @@ func RegisterRoutes(r chi.Router, c *client.Client, empresa *handler.EmpresaHand
 		r.Post("/import", documento.Import)
 		r.Post("/export", documento.Export)
 		r.Post("/backfill", documento.Backfill)
+		r.Post("/manifestar", documento.Manifestar)
 	})
 
 	r.Get("/cnpj/{cnpj}", cnpj.Lookup)

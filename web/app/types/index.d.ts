@@ -180,6 +180,21 @@ export interface EmpresaSyncState {
   ultima_sync_nfse?: string
 }
 
+export interface ManifestacaoResultItem {
+  id: number
+  chave_acesso: string
+  status: 'sucesso' | 'erro'
+  cstat?: string
+  erro?: string
+}
+
+export interface ManifestacaoResult {
+  total: number
+  sucesso: number
+  erros: number
+  resultados: ManifestacaoResultItem[]
+}
+
 export interface EmpresaDocumentoStats {
   total: number
   xml_completo: number
