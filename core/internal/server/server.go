@@ -38,11 +38,12 @@ func New(cfg *config.Config, db *bun.DB, log zerolog.Logger) *Server {
 
 	empresaRepo := repository.NewEmpresaRepository(db)
 	documentoRepo := repository.NewDocumentoRepository(db)
+	documentoItemRepo := repository.NewDocumentoItemRepository(db)
 
 	empresaService := service.NewEmpresaService(empresaRepo)
-	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
-	importService := service.NewImportService(documentoRepo, empresaRepo, storage, log)
-	documentoService := service.NewDocumentoService(documentoRepo, storage, c, log)
+	syncService := service.NewSyncService(empresaRepo, documentoRepo, documentoItemRepo, c, storage, log)
+	importService := service.NewImportService(documentoRepo, documentoItemRepo, empresaRepo, storage, log)
+	documentoService := service.NewDocumentoService(documentoRepo, documentoItemRepo, storage, c, log)
 	empresaHandler := handler.NewEmpresaHandler(empresaService, syncService, importService, documentoRepo, log)
 	documentoHandler := handler.NewDocumentoHandler(documentoService, importService, syncService, documentoRepo, log)
 	cnpjHandler := handler.NewCNPJHandler(log)

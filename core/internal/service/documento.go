@@ -61,14 +61,15 @@ type DocumentoBackfillResult struct {
 }
 
 type DocumentoService struct {
-	repo    *repository.DocumentoRepository
-	storage DocumentStorage
-	client  *client.Client
-	log     zerolog.Logger
+	repo     *repository.DocumentoRepository
+	itemRepo *repository.DocumentoItemRepository
+	storage  DocumentStorage
+	client   *client.Client
+	log      zerolog.Logger
 }
 
-func NewDocumentoService(repo *repository.DocumentoRepository, storage DocumentStorage, c *client.Client, log zerolog.Logger) *DocumentoService {
-	return &DocumentoService{repo: repo, storage: storage, client: c, log: log}
+func NewDocumentoService(repo *repository.DocumentoRepository, itemRepo *repository.DocumentoItemRepository, storage DocumentStorage, c *client.Client, log zerolog.Logger) *DocumentoService {
+	return &DocumentoService{repo: repo, itemRepo: itemRepo, storage: storage, client: c, log: log}
 }
 
 func (s *DocumentoService) List(filter DocumentoListFilter) ([]model.DocumentoFiscal, int64, error) {
@@ -253,8 +254,8 @@ func (s *DocumentoService) Backfill(ctx context.Context, limit int) (*DocumentoB
 		}
 
 		xmlContent := string(xmlBytes)
-		valorTotal := extractValorDecimal(xmlContent, "vNF")
-		valorProdutos := extractValorDecimal(xmlContent, "vProd")
+		valorTotal := extractValorTotal(xmlContent)
+		valorProdutos := extractValorProdutos(xmlContent)
 
 		if valorTotal == 0 && valorProdutos == 0 {
 			result.Skipped++
@@ -271,6 +272,56 @@ func (s *DocumentoService) Backfill(ctx context.Context, limit int) (*DocumentoB
 	}
 
 	return result, nil
+}
+
+func (s *DocumentoService) BackfillItens(ctx context.Context, limit int) (*DocumentoBackfillResult, error) {
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+
+	docs, err := s.repo.ListSemItens(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("listing docs sem itens: %w", err)
+	}
+
+	result := &DocumentoBackfillResult{}
+
+	for i := range docs {
+		doc := &docs[i]
+		result.Processed++
+
+		if s.storage == nil || strings.TrimSpace(doc.XMLObjectKey) == "" {
+			result.Skipped++
+			continue
+		}
+
+		xmlBytes, err := s.storage.GetObject(ctx, doc.XMLObjectKey)
+		if err != nil {
+			s.log.Warn().Err(err).Uint("id", doc.ID).Msg("backfill-itens: failed to read xml")
+			result.Skipped++
+			continue
+		}
+
+		itens := ExtractItens(string(xmlBytes))
+		if len(itens) == 0 {
+			result.Skipped++
+			continue
+		}
+
+		if err := s.itemRepo.UpsertItens(ctx, doc.ID, itens); err != nil {
+			s.log.Warn().Err(err).Uint("id", doc.ID).Msg("backfill-itens: failed to upsert")
+			result.Skipped++
+			continue
+		}
+
+		result.Uploaded++
+	}
+
+	return result, nil
+}
+
+func (s *DocumentoService) ListItens(ctx context.Context, documentoID uint) ([]model.DocumentoItem, error) {
+	return s.itemRepo.ListByDocumentoID(ctx, documentoID)
 }
 
 func (s *DocumentoService) loadOrGenerateDanfe(ctx context.Context, doc *model.DocumentoFiscal, xmlContent string) ([]byte, error) {

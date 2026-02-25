@@ -27,16 +27,18 @@ const (
 type SyncService struct {
 	empresaRepo   *repository.EmpresaRepository
 	documentoRepo *repository.DocumentoRepository
+	itemRepo      *repository.DocumentoItemRepository
 	client        *client.Client
 	storage       DocumentStorage
 	log           zerolog.Logger
 	rateLimiter   *RateLimiter
 }
 
-func NewSyncService(empresaRepo *repository.EmpresaRepository, documentoRepo *repository.DocumentoRepository, c *client.Client, storage DocumentStorage, log zerolog.Logger) *SyncService {
+func NewSyncService(empresaRepo *repository.EmpresaRepository, documentoRepo *repository.DocumentoRepository, itemRepo *repository.DocumentoItemRepository, c *client.Client, storage DocumentStorage, log zerolog.Logger) *SyncService {
 	return &SyncService{
 		empresaRepo:   empresaRepo,
 		documentoRepo: documentoRepo,
+		itemRepo:      itemRepo,
 		client:        c,
 		storage:       storage,
 		log:           log,
@@ -273,6 +275,30 @@ func (s *SyncService) syncEmpresa(empresa model.Empresa, force bool) error {
 				s.log.Error().Err(err).Uint("empresa_id", empresa.ID).Msg("persist documentos failed")
 			}
 			totalDocs += len(docs)
+
+			s.extractAndSaveItens(ctx, empresa.ID, parsed.Documents)
+		}
+
+		for _, ev := range parsed.Events {
+			if ev.ChaveAcesso == "" {
+				continue
+			}
+			if newStatus := StatusFromTpEvento(ev.TpEvento); newStatus != "" {
+				if err := s.documentoRepo.UpdateStatusByChave(ctx, empresa.ID, ev.ChaveAcesso, newStatus); err != nil {
+					s.log.Warn().Err(err).
+						Str("chave", ev.ChaveAcesso).
+						Str("tp_evento", ev.TpEvento).
+						Msg("failed to apply event status")
+				}
+			}
+			if manifStatus := ManifestacaoFromTpEvento(ev.TpEvento); manifStatus != "" {
+				if err := s.documentoRepo.UpdateManifestacaoByChave(ctx, empresa.ID, ev.ChaveAcesso, manifStatus, time.Now()); err != nil {
+					s.log.Warn().Err(err).
+						Str("chave", ev.ChaveAcesso).
+						Str("tp_evento", ev.TpEvento).
+						Msg("failed to apply event manifestacao")
+				}
+			}
 		}
 
 		// Persist NSU after each successful iteration so progress is never lost.
@@ -523,6 +549,28 @@ func (s *SyncService) baixarDocsBloqueados(ctx context.Context, empresa model.Em
 			Msg("fallback: upgraded resNFe to full XML via consChNFe")
 
 		sleepWithJitter(loopSleepMinSecs, loopSleepMaxSecs)
+	}
+}
+
+func (s *SyncService) extractAndSaveItens(ctx context.Context, empresaID uint, documents []Document) {
+	for _, d := range documents {
+		if d.XMLResumo || d.ChaveAcesso == "" {
+			continue
+		}
+		if d.DocumentType != "nf-e" && d.DocumentType != "nfc-e" {
+			continue
+		}
+		itens := ExtractItens(d.XML)
+		if len(itens) == 0 {
+			continue
+		}
+		doc, err := s.documentoRepo.FindByChave(ctx, empresaID, d.ChaveAcesso)
+		if err != nil || doc == nil {
+			continue
+		}
+		if err := s.itemRepo.UpsertItens(ctx, doc.ID, itens); err != nil {
+			s.log.Warn().Err(err).Str("chave", d.ChaveAcesso).Msg("sync: failed to save itens")
+		}
 	}
 }
 

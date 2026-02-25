@@ -129,6 +129,20 @@ func (s *NFSeSyncService) SyncEmpresaNFSe(empresa model.Empresa) error {
 				continue
 			}
 
+			if d.TipoDocumento == "EVENTO" {
+				chave := extractTagValue(xmlContent, "chNFSe")
+				if chave != "" {
+					if newStatus := NFSeStatusFromEvento(xmlContent); newStatus != "" {
+						if err := s.documentoRepo.UpdateStatusByChave(ctx, empresa.ID, chave, newStatus); err != nil {
+							s.log.Warn().Err(err).Str("chave", chave).Str("status", newStatus).Msg("nfse: failed to apply event status")
+						} else {
+							s.log.Info().Str("chave", chave).Str("status", newStatus).Msg("nfse: applied event to document")
+						}
+					}
+				}
+				continue
+			}
+
 			parsed := ParseNFSeXML(xmlContent)
 
 			chave := firstNonEmpty(parsed.ChaveAcesso, d.ChaveAcesso)

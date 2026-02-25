@@ -142,6 +142,48 @@ export interface DocumentoFiscal {
   valor_produtos?: number
 }
 
+export interface DocumentoItem {
+  id: number
+  documento_id: number
+  n_item: number
+  c_prod: string
+  c_ean: string
+  x_prod: string
+  ncm: string
+  cest: string
+  cfop: string
+  u_com: string
+  q_com: number
+  v_un_com: number
+  v_prod: number
+  v_desc: number
+  v_frete: number
+  v_seg: number
+  v_outro: number
+  x_ped: string
+  n_item_ped: string
+  inf_ad_prod: string
+  icms_orig: string
+  icms_cst: string
+  icms_v_icms: number
+  ipi_cst: string
+  ipi_v_ipi: number
+  pis_cst: string
+  pis_v_pis: number
+  cofins_cst: string
+  cofins_v_cofins: number
+  ibscbs_cst: string
+  ibscbs_v_ibs_uf?: number
+  ibscbs_v_ibs_mun?: number
+  ibscbs_v_cbs?: number
+  v_tot_trib?: number
+}
+
+export interface DocumentoItensResponse {
+  items: DocumentoItem[]
+  total: number
+}
+
 export interface DocumentoListResponse {
   items: DocumentoFiscal[]
   total: number

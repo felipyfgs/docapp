@@ -49,14 +49,16 @@ type UnknownEmpresa struct {
 
 type ImportService struct {
 	documentoRepo *repository.DocumentoRepository
+	itemRepo      *repository.DocumentoItemRepository
 	empresaRepo   *repository.EmpresaRepository
 	storage       DocumentStorage
 	log           zerolog.Logger
 }
 
-func NewImportService(documentoRepo *repository.DocumentoRepository, empresaRepo *repository.EmpresaRepository, storage DocumentStorage, log zerolog.Logger) *ImportService {
+func NewImportService(documentoRepo *repository.DocumentoRepository, itemRepo *repository.DocumentoItemRepository, empresaRepo *repository.EmpresaRepository, storage DocumentStorage, log zerolog.Logger) *ImportService {
 	return &ImportService{
 		documentoRepo: documentoRepo,
+		itemRepo:      itemRepo,
 		empresaRepo:   empresaRepo,
 		storage:       storage,
 		log:           log,
@@ -103,6 +105,13 @@ func (s *ImportService) ImportDocumentos(ctx context.Context, empresa model.Empr
 	result := ImportResult{}
 	var batch []model.DocumentoFiscal
 
+	type pendingItem struct {
+		chave string
+		xml   string
+		tipo  string
+	}
+	var pendingItens []pendingItem
+
 	flush := func() {
 		if len(batch) == 0 {
 			return
@@ -115,6 +124,24 @@ func (s *ImportService) ImportDocumentos(ctx context.Context, empresa model.Empr
 			result.Imported += len(batch)
 		}
 		batch = batch[:0]
+
+		for _, pi := range pendingItens {
+			if pi.tipo != "nf-e" && pi.tipo != "nfc-e" {
+				continue
+			}
+			itens := ExtractItens(pi.xml)
+			if len(itens) == 0 {
+				continue
+			}
+			doc, err := s.documentoRepo.FindByChave(ctx, empresa.ID, pi.chave)
+			if err != nil || doc == nil {
+				continue
+			}
+			if err := s.itemRepo.UpsertItens(ctx, doc.ID, itens); err != nil {
+				s.log.Warn().Err(err).Str("chave", pi.chave).Msg("import: failed to save itens")
+			}
+		}
+		pendingItens = pendingItens[:0]
 	}
 
 	for _, f := range files {
@@ -129,7 +156,6 @@ func (s *ImportService) ImportDocumentos(ctx context.Context, empresa model.Empr
 			continue
 		}
 
-		// Use deterministic NSU derived from chave when not in filename
 		if nsu == "" {
 			nsu = nsuFromChave(doc.ChaveAcesso)
 			doc.NSU = nsu
@@ -176,6 +202,10 @@ func (s *ImportService) ImportDocumentos(ctx context.Context, empresa model.Empr
 			ValorTotal:       doc.ValorTotal,
 			ValorProdutos:    doc.ValorProdutos,
 		})
+
+		if doc.ChaveAcesso != "" {
+			pendingItens = append(pendingItens, pendingItem{chave: doc.ChaveAcesso, xml: xmlContent, tipo: doc.DocumentType})
+		}
 
 		if len(batch) >= importBatchSize {
 			flush()

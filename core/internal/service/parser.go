@@ -24,6 +24,15 @@ type DistDFeResponse struct {
 	UltNSU    string     `json:"ult_nsu"`
 	MaxNSU    string     `json:"max_nsu"`
 	Documents []Document `json:"documents"`
+	Events    []EventDoc `json:"events,omitempty"`
+}
+
+type EventDoc struct {
+	NSU         string `json:"nsu"`
+	Schema      string `json:"schema"`
+	ChaveAcesso string `json:"chave_acesso"`
+	TpEvento    string `json:"tp_evento"`
+	XML         string `json:"xml"`
 }
 
 type Document struct {
@@ -90,6 +99,18 @@ func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
 				continue
 			}
 
+			if isEventSchema(dz.Schema) {
+				chave := extractTagValue(docXML, "chNFe", "chCTe")
+				resp.Events = append(resp.Events, EventDoc{
+					NSU:         dz.NSU,
+					Schema:      dz.Schema,
+					ChaveAcesso: chave,
+					TpEvento:    extractTagValue(docXML, "tpEvento"),
+					XML:         docXML,
+				})
+				continue
+			}
+
 			dataEmissao := extractDataEmissao(docXML)
 			docType := documentTypeFromSchemaAndXML(dz.Schema, docXML)
 
@@ -108,8 +129,8 @@ func ParseDistDFeResponse(rawXML string) (*DistDFeResponse, error) {
 				XML:              docXML,
 				ChaveAcesso:      extractChaveAcesso(docXML),
 				DataEmissao:      dataEmissao,
-				ValorTotal:       extractValorDecimal(docXML, "vNF"),
-				ValorProdutos:    extractValorDecimal(docXML, "vProd"),
+				ValorTotal:       extractValorTotal(docXML),
+				ValorProdutos:    extractValorProdutos(docXML),
 			}
 
 			resp.Documents = append(resp.Documents, doc)
@@ -345,6 +366,79 @@ func isResumoDocument(schema string) bool {
 	return strings.Contains(s, "res")
 }
 
+func isEventSchema(schema string) bool {
+	s := strings.ToLower(strings.TrimSpace(schema))
+	return strings.Contains(s, "evento") || strings.Contains(s, "resevento")
+}
+
+func StatusFromTpEvento(tpEvento string) string {
+	switch tpEvento {
+	case "110111", "110112":
+		return "cancelada"
+	default:
+		return ""
+	}
+}
+
+func ManifestacaoFromTpEvento(tpEvento string) string {
+	switch tpEvento {
+	case "210200":
+		return "confirmada"
+	case "210210":
+		return "ciencia"
+	case "210220":
+		return "desconhecida"
+	case "210240":
+		return "nao_realizada"
+	default:
+		return ""
+	}
+}
+
+// NFS-e Nacional event types (from ANEXO_II-SEFIN_ADN-PEDREGEVT_EVT, tiposEventos_v1.01.xsd)
+//
+// Cancelamento events:
+//   e101101 - Cancelamento de NFS-e (solicitado pelo prestador)
+//   e105101 - Cancelamento de Oficio
+//   e105102 - Cancelamento por Decisao Judicial
+//   e105103 - Cancelamento por Decisao Administrativa
+//   e105104 - Cancelamento Deferido (aprovado pela prefeitura)
+//
+// Other events:
+//   e202201 - Bloqueio/Rejeicao de NFS-e
+//   e203201 - Desbloqueio de NFS-e
+//   e204201 - Substituicao de NFS-e
+//   e305101 - Cancelamento de Evento (anula um evento anterior)
+
+var nfseCancelamentoTags = []string{
+	"e101101",
+	"e105101",
+	"e105102",
+	"e105103",
+	"e105104",
+}
+
+func isNFSeCancelamentoEvento(xmlContent string) bool {
+	for _, tag := range nfseCancelamentoTags {
+		if strings.Contains(xmlContent, "<"+tag) {
+			return true
+		}
+	}
+	return false
+}
+
+func NFSeStatusFromEvento(xmlContent string) string {
+	for _, tag := range nfseCancelamentoTags {
+		if strings.Contains(xmlContent, "<"+tag) {
+			return "cancelada"
+		}
+	}
+	if strings.Contains(xmlContent, "<e204201") {
+		return "substituida"
+	}
+	return ""
+}
+
 func extractPartyName(xmlContent, section string) string {
 	body := extractSectionBody(xmlContent, section)
 	if body == "" {
@@ -450,7 +544,7 @@ func isAuthorizedStatusCode(code string) bool {
 
 func isCancelledStatusCode(code string) bool {
 	switch code {
-	case "101", "135", "136", "151", "155":
+	case "101", "151", "155":
 		return true
 	default:
 		return false
@@ -560,14 +654,40 @@ func ParseNFeProcXML(xmlContent string, nsu string) Document {
 		XML:              xmlContent,
 		ChaveAcesso:      extractChaveAcesso(xmlContent),
 		DataEmissao:      dataEmissao,
-		ValorTotal:       extractValorDecimal(xmlContent, "vNF"),
-		ValorProdutos:    extractValorDecimal(xmlContent, "vProd"),
+		ValorTotal:       extractValorTotal(xmlContent),
+		ValorProdutos:    extractValorProdutos(xmlContent),
 	}
 }
 
-// extractValorDecimal extracts a decimal value from a tag like <vNF>1234.56</vNF>.
-func extractValorDecimal(xmlContent, tag string) float64 {
-	raw := strings.TrimSpace(extractTagValue(xmlContent, tag))
+// extractValorTotal extracts the total document value from <ICMSTot> or <total> sections.
+// Falls back to extracting from full XML if sections not found.
+func extractValorTotal(xmlContent string) float64 {
+	for _, section := range []string{"ICMSTot", "total"} {
+		body := extractSectionBody(xmlContent, section)
+		if body != "" {
+			if v := parseDecimal(extractTagValue(body, "vNF")); v > 0 {
+				return v
+			}
+		}
+	}
+	return parseDecimal(extractTagValue(xmlContent, "vNF"))
+}
+
+// extractValorProdutos extracts total products value from <ICMSTot> or <total> sections.
+func extractValorProdutos(xmlContent string) float64 {
+	for _, section := range []string{"ICMSTot", "total"} {
+		body := extractSectionBody(xmlContent, section)
+		if body != "" {
+			if v := parseDecimal(extractTagValue(body, "vProd")); v > 0 {
+				return v
+			}
+		}
+	}
+	return parseDecimal(extractTagValue(xmlContent, "vProd"))
+}
+
+func parseDecimal(raw string) float64 {
+	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return 0
 	}
@@ -576,6 +696,11 @@ func extractValorDecimal(xmlContent, tag string) float64 {
 		return 0
 	}
 	return v
+}
+
+// extractValorDecimal extracts a decimal value from a tag like <vNF>1234.56</vNF>.
+func extractValorDecimal(xmlContent, tag string) float64 {
+	return parseDecimal(extractTagValue(xmlContent, tag))
 }
 
 // NSUFromFilename extracts the 15-digit NSU from filenames like WS_<NSU>_<chave>.xml.

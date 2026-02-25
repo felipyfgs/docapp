@@ -153,6 +153,45 @@ func (h *DocumentoHandler) Export(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(result.Content)
 }
 
+func (h *DocumentoHandler) Itens(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": "ID inválido."})
+		return
+	}
+
+	itens, err := h.svc.ListItens(r.Context(), id)
+	if err != nil {
+		h.log.Error().Err(err).Uint("id", id).Msg("list itens failed")
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"message": "Erro ao listar itens."})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"items": itens,
+		"total": len(itens),
+	})
+}
+
+func (h *DocumentoHandler) BackfillItens(w http.ResponseWriter, r *http.Request) {
+	var req backfillRequest
+	if r.Body != nil {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "Payload inválido."})
+			return
+		}
+	}
+
+	result, err := h.svc.BackfillItens(r.Context(), req.Limit)
+	if err != nil {
+		h.log.Error().Err(err).Msg("backfill itens failed")
+		writeJSON(w, http.StatusBadRequest, map[string]string{"message": err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 func (h *DocumentoHandler) Backfill(w http.ResponseWriter, r *http.Request) {
 	var req backfillRequest
 	if r.Body != nil {

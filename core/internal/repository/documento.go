@@ -93,6 +93,23 @@ func (r *DocumentoRepository) GetByID(ctx context.Context, id uint) (*model.Docu
 	return &doc, nil
 }
 
+func (r *DocumentoRepository) FindByChave(ctx context.Context, empresaID uint, chaveAcesso string) (*model.DocumentoFiscal, error) {
+	var doc model.DocumentoFiscal
+	err := r.db.NewSelect().Model(&doc).
+		Where("df.empresa_id = ?", empresaID).
+		Where("df.chave_acesso = ?", chaveAcesso).
+		Where("df.deleted_at IS NULL").
+		Limit(1).
+		Scan(ctx)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &doc, nil
+}
+
 func (r *DocumentoRepository) ListByIDs(ctx context.Context, ids []uint) ([]model.DocumentoFiscal, error) {
 	if len(ids) == 0 {
 		return []model.DocumentoFiscal{}, nil
@@ -277,6 +294,29 @@ func (r *DocumentoRepository) UpgradeFromResumo(ctx context.Context, id uint, do
 	return err
 }
 
+func (r *DocumentoRepository) UpdateStatusByChave(ctx context.Context, empresaID uint, chaveAcesso string, status string) error {
+	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
+		Set("status_documento = ?", status).
+		Set("updated_at = ?", time.Now()).
+		Where("empresa_id = ?", empresaID).
+		Where("chave_acesso = ?", chaveAcesso).
+		Where("deleted_at IS NULL").
+		Exec(ctx)
+	return err
+}
+
+func (r *DocumentoRepository) UpdateManifestacaoByChave(ctx context.Context, empresaID uint, chaveAcesso string, status string, at time.Time) error {
+	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
+		Set("manifestacao_status = ?", status).
+		Set("manifestacao_at = ?", at).
+		Set("updated_at = ?", time.Now()).
+		Where("empresa_id = ?", empresaID).
+		Where("chave_acesso = ?", chaveAcesso).
+		Where("deleted_at IS NULL").
+		Exec(ctx)
+	return err
+}
+
 func (r *DocumentoRepository) UpdateManifestacaoStatus(ctx context.Context, id uint, status string, at time.Time) error {
 	_, err := r.db.NewUpdate().Model((*model.DocumentoFiscal)(nil)).
 		Set("manifestacao_status = ?", status).
@@ -397,6 +437,23 @@ func (r *DocumentoRepository) ListSemValor(ctx context.Context, limit int) ([]mo
 		Where("df.valor_total = 0").
 		Where("df.xml_resumo = FALSE").
 		Where("df.xml_object_key != ''").
+		OrderExpr("df.id ASC").
+		Limit(limit).
+		Scan(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return docs, nil
+}
+
+func (r *DocumentoRepository) ListSemItens(ctx context.Context, limit int) ([]model.DocumentoFiscal, error) {
+	docs := make([]model.DocumentoFiscal, 0)
+	err := r.db.NewSelect().Model(&docs).
+		Where("df.deleted_at IS NULL").
+		Where("df.xml_resumo = FALSE").
+		Where("df.xml_object_key != ''").
+		Where("df.tipo_documento IN ('nf-e', 'nfc-e')").
+		Where("NOT EXISTS (SELECT 1 FROM documento_itens di WHERE di.documento_id = df.id)").
 		OrderExpr("df.id ASC").
 		Limit(limit).
 		Scan(ctx)

@@ -161,4 +161,71 @@ type DocumentoFiscal struct {
 	ManifestacaoAt     *time.Time `bun:"manifestacao_at,nullzero" json:"manifestacao_at"`
 	ValorTotal         float64    `bun:"valor_total" json:"valor_total"`
 	ValorProdutos      float64    `bun:"valor_produtos" json:"valor_produtos"`
+
+	Itens []DocumentoItem `bun:"rel:has-many,join:id=documento_id" json:"itens,omitempty"`
+}
+
+type DocumentoItem struct {
+	bun.BaseModel `bun:"table:documento_itens,alias:di"`
+
+	ID          uint   `bun:",pk,autoincrement" json:"id"`
+	DocumentoID uint   `bun:"documento_id,notnull" json:"documento_id"`
+	NItem       int    `bun:"n_item,notnull" json:"n_item"`
+
+	CProd     string  `bun:"c_prod" json:"c_prod"`
+	CEAN      string  `bun:"c_ean" json:"c_ean"`
+	XProd     string  `bun:"x_prod,notnull" json:"x_prod"`
+	NCM       string  `bun:"ncm" json:"ncm"`
+	CEST      string  `bun:"cest" json:"cest"`
+	CFOP      string  `bun:"cfop" json:"cfop"`
+	UCom      string  `bun:"u_com" json:"u_com"`
+	QCom      float64 `bun:"q_com,notnull" json:"q_com"`
+	VUnCom    float64 `bun:"v_un_com,notnull" json:"v_un_com"`
+	VProd     float64 `bun:"v_prod,notnull" json:"v_prod"`
+	VDesc     float64 `bun:"v_desc" json:"v_desc"`
+	VFrete    float64 `bun:"v_frete" json:"v_frete"`
+	VSeg      float64 `bun:"v_seg" json:"v_seg"`
+	VOutro    float64 `bun:"v_outro" json:"v_outro"`
+	XPed      string  `bun:"x_ped" json:"x_ped"`
+	NItemPed  string  `bun:"n_item_ped" json:"n_item_ped"`
+	InfAdProd string  `bun:"inf_ad_prod" json:"inf_ad_prod"`
+
+	ICMSOrig      string   `bun:"icms_orig" json:"icms_orig"`
+	ICMSCST       string   `bun:"icms_cst" json:"icms_cst"`
+	ICMSModBC     string   `bun:"icms_mod_bc" json:"icms_mod_bc"`
+	ICMSPRedBC    *float64 `bun:"icms_p_red_bc" json:"icms_p_red_bc"`
+	ICMSVBC       *float64 `bun:"icms_v_bc" json:"icms_v_bc"`
+	ICMSPICMS     *float64 `bun:"icms_p_icms" json:"icms_p_icms"`
+	ICMSVICMS     float64  `bun:"icms_v_icms,notnull" json:"icms_v_icms"`
+	ICMSVBCST     *float64 `bun:"icms_v_bc_st" json:"icms_v_bc_st"`
+	ICMSPST       *float64 `bun:"icms_p_st" json:"icms_p_st"`
+	ICMSVICMSST   *float64 `bun:"icms_v_icms_st" json:"icms_v_icms_st"`
+	ICMSVICMSDeson *float64 `bun:"icms_v_icms_deson" json:"icms_v_icms_deson"`
+
+	IPICST  string   `bun:"ipi_cst" json:"ipi_cst"`
+	IPIVBC  *float64 `bun:"ipi_v_bc" json:"ipi_v_bc"`
+	IPIPIPI *float64 `bun:"ipi_p_ipi" json:"ipi_p_ipi"`
+	IPIVIPI float64  `bun:"ipi_v_ipi,notnull" json:"ipi_v_ipi"`
+
+	PISCST  string   `bun:"pis_cst" json:"pis_cst"`
+	PISVBC  *float64 `bun:"pis_v_bc" json:"pis_v_bc"`
+	PISPPIS *float64 `bun:"pis_p_pis" json:"pis_p_pis"`
+	PISVPIS float64  `bun:"pis_v_pis,notnull" json:"pis_v_pis"`
+
+	COFINSCST      string   `bun:"cofins_cst" json:"cofins_cst"`
+	COFINSVBC      *float64 `bun:"cofins_v_bc" json:"cofins_v_bc"`
+	COFINSPCOFINS  *float64 `bun:"cofins_p_cofins" json:"cofins_p_cofins"`
+	COFINSVCOFINS  float64  `bun:"cofins_v_cofins,notnull" json:"cofins_v_cofins"`
+
+	IBSCBSCST         string   `bun:"ibscbs_cst" json:"ibscbs_cst"`
+	IBSCBSCClassTrib  string   `bun:"ibscbs_c_class_trib" json:"ibscbs_c_class_trib"`
+	IBSCBSVBC         *float64 `bun:"ibscbs_v_bc" json:"ibscbs_v_bc"`
+	IBSCBSPIBSUF      *float64 `bun:"ibscbs_p_ibs_uf" json:"ibscbs_p_ibs_uf"`
+	IBSCBSVIBSUF      *float64 `bun:"ibscbs_v_ibs_uf" json:"ibscbs_v_ibs_uf"`
+	IBSCBSPIBSMun     *float64 `bun:"ibscbs_p_ibs_mun" json:"ibscbs_p_ibs_mun"`
+	IBSCBSVIBSMun     *float64 `bun:"ibscbs_v_ibs_mun" json:"ibscbs_v_ibs_mun"`
+	IBSCBSPCBS        *float64 `bun:"ibscbs_p_cbs" json:"ibscbs_p_cbs"`
+	IBSCBSVCBS        *float64 `bun:"ibscbs_v_cbs" json:"ibscbs_v_cbs"`
+
+	VTotTrib *float64 `bun:"v_tot_trib" json:"v_tot_trib"`
 }

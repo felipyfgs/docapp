@@ -42,8 +42,9 @@ func main() {
 
 	empresaRepo := repository.NewEmpresaRepository(bunDB)
 	documentoRepo := repository.NewDocumentoRepository(bunDB)
+	documentoItemRepo := repository.NewDocumentoItemRepository(bunDB)
 	empresaService := service.NewEmpresaService(empresaRepo)
-	syncService := service.NewSyncService(empresaRepo, documentoRepo, c, storage, log)
+	syncService := service.NewSyncService(empresaRepo, documentoRepo, documentoItemRepo, c, storage, log)
 	nfseSyncService := service.NewNFSeSyncService(empresaRepo, documentoRepo, storage, log, cfg.ADNBaseURL)
 
 	interval := time.Duration(cfg.WorkerIntervalMinutes) * time.Minute
