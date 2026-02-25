@@ -4,6 +4,7 @@ import type { DocumentoFiscal, DocumentoListResponse } from '~/types'
 const tableRef = useTemplateRef<{ selectedRows: DocumentoFiscal[] }>('table')
 const importModalRef = useTemplateRef<{ show: () => void }>('importModal')
 const exportModalRef = useTemplateRef<{ show: () => void }>('exportModal')
+const manifestacaoModalRef = useTemplateRef<{ show: () => void }>('manifestacaoModal')
 const xmlModalRef = useTemplateRef<{ show: (doc: DocumentoFiscal) => void }>('xmlModal')
 
 const { data, status, refresh } = await useFetch<DocumentoListResponse>('/api/documentos', {
@@ -11,7 +12,7 @@ const { data, status, refresh } = await useFetch<DocumentoListResponse>('/api/do
   query: { page: 1, page_size: 500 }
 })
 
-const documentos = computed(() => data.value?.items ?? [])
+const documentos = computed(() => (data.value?.items ?? []).filter(d => !d.xml_resumo))
 const selectedRows = computed(() => tableRef.value?.selectedRows ?? [])
 const selectedCount = computed(() => selectedRows.value.length)
 </script>
@@ -54,6 +55,18 @@ const selectedCount = computed(() => selectedRows.value.length)
         <template #actions>
           <UButton
             v-if="selectedCount > 0"
+            label="Manifestar"
+            color="neutral"
+            variant="outline"
+            icon="i-lucide-stamp"
+            @click="manifestacaoModalRef?.show()"
+          >
+            <template #trailing>
+              <UKbd>{{ selectedCount }}</UKbd>
+            </template>
+          </UButton>
+          <UButton
+            v-if="selectedCount > 0"
             label="Exportar"
             color="primary"
             icon="i-lucide-download"
@@ -70,5 +83,6 @@ const selectedCount = computed(() => selectedRows.value.length)
 
   <DocumentosImportModal ref="importModal" @imported="refresh()" />
   <DocumentosExportModal ref="exportModal" :selected-rows="selectedRows" />
+  <DocumentosManifestacaoModal ref="manifestacaoModal" :selected-rows="selectedRows" @done="refresh()" />
   <DocumentosXmlModal ref="xmlModal" />
 </template>

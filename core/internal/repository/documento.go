@@ -261,8 +261,13 @@ func (r *DocumentoRepository) UpgradeFromResumo(ctx context.Context, id uint, do
 		Set("destinatario_cnpj = NULLIF(?, '')", doc.DestinatarioCNPJ).
 		Set("numero_documento = ?", doc.NumeroDocumento).
 		Set("status_documento = ?", doc.StatusDocumento).
+		Set("tipo_documento = ?", doc.TipoDocumento).
 		Set("schema_nome = ?", doc.Schema).
 		Set("search_text = ?", doc.SearchText).
+		Set("data_emissao = ?", doc.DataEmissao).
+		Set("competencia = ?", doc.Competencia).
+		Set("valor_total = ?", doc.ValorTotal).
+		Set("valor_produtos = ?", doc.ValorProdutos).
 		Set("manifestacao_status = ?", doc.ManifestacaoStatus).
 		Set("manifestacao_at = ?", doc.ManifestacaoAt).
 		Set("updated_at = ?", time.Now()).

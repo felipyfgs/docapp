@@ -46,6 +46,8 @@ services:
       - SEFAZ_RETRY_AFTER_SECONDS=3600
     volumes:
       - ./sped:/var/www/html
+      - sped_vendor:/var/www/html/vendor
+      - sped_bootstrap_cache:/var/www/html/bootstrap/cache
       - ./core/certs:/var/www/html/storage/certs:ro
     deploy:
       resources:
@@ -82,3 +84,5 @@ networks:
 volumes:
   postgres_data:
   minio_data:
+  sped_vendor:
+  sped_bootstrap_cache:

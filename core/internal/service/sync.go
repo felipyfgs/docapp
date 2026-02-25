@@ -496,8 +496,13 @@ func (s *SyncService) baixarDocsBloqueados(ctx context.Context, empresa model.Em
 			DestinatarioCNPJ:   fullDoc.DestinatarioCNPJ,
 			NumeroDocumento:    fullDoc.NumeroDocumento,
 			StatusDocumento:    fullDoc.StatusDocumento,
+			TipoDocumento:      fullDoc.DocumentType,
 			Schema:             fullDoc.Schema,
 			SearchText:         buildDocumentSearchText(empresa.CNPJ, fullDoc),
+			DataEmissao:        fullDoc.DataEmissao,
+			Competencia:        fullDoc.Competencia,
+			ValorTotal:         fullDoc.ValorTotal,
+			ValorProdutos:      fullDoc.ValorProdutos,
 			ManifestacaoStatus: "ciencia",
 			ManifestacaoAt:     &now,
 		}); err != nil {

@@ -25,6 +25,20 @@ const tipoEventoOptions = [
 
 const requiresJustificativa = computed(() => tipoEvento.value === '210240')
 
+const elegiveis = computed(() =>
+  props.selectedRows.filter(d => d.chave_acesso && !d.manifestacao_status)
+)
+
+const jaManifestados = computed(() =>
+  props.selectedRows.filter(d => !!d.manifestacao_status)
+)
+
+const semChave = computed(() =>
+  props.selectedRows.filter(d => !d.chave_acesso)
+)
+
+const filtrados = computed(() => jaManifestados.value.length + semChave.value.length)
+
 function show() {
   if (props.selectedRows.length === 0) return
   result.value = null
@@ -33,7 +47,7 @@ function show() {
 }
 
 async function handleManifestar() {
-  const ids = props.selectedRows.map(d => d.id)
+  const ids = elegiveis.value.map(d => d.id)
   if (ids.length === 0) return
 
   processing.value = true
@@ -76,26 +90,56 @@ defineExpose({ show })
   <UModal
     v-model:open="open"
     title="Manifestar Documentos"
-    :description="`${selectedRows.length} documento(s) selecionado(s)`"
+    :description="`${selectedRows.length} selecionado(s) · ${elegiveis.length} elegível(is)`"
   >
     <template #body>
       <div class="space-y-4">
-        <UFormField label="Tipo de Manifestação">
-          <USelect
-            v-model="tipoEvento"
-            :items="tipoEventoOptions"
-            class="w-full"
-          />
-        </UFormField>
+        <UAlert
+          v-if="filtrados > 0"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-info"
+          :title="`${filtrados} documento(s) filtrado(s)`"
+        >
+          <template #description>
+            <ul class="text-xs space-y-0.5 mt-1">
+              <li v-if="jaManifestados.length > 0">
+                {{ jaManifestados.length }} já manifestado(s)
+              </li>
+              <li v-if="semChave.length > 0">
+                {{ semChave.length }} sem chave de acesso
+              </li>
+            </ul>
+          </template>
+        </UAlert>
 
-        <UFormField v-if="requiresJustificativa" label="Justificativa">
-          <UTextarea
-            v-model="justificativa"
-            placeholder="Informe a justificativa (obrigatório para Operação Não Realizada)"
-            :rows="3"
-            class="w-full"
-          />
-        </UFormField>
+        <UAlert
+          v-if="elegiveis.length === 0"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-circle-x"
+          title="Nenhum documento elegível para manifestação"
+          description="Todos os documentos selecionados já foram manifestados ou não possuem chave de acesso."
+        />
+
+        <template v-if="elegiveis.length > 0">
+          <UFormField label="Tipo de Manifestação">
+            <USelect
+              v-model="tipoEvento"
+              :items="tipoEventoOptions"
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField v-if="requiresJustificativa" label="Justificativa">
+            <UTextarea
+              v-model="justificativa"
+              placeholder="Informe a justificativa (obrigatório para Operação Não Realizada)"
+              :rows="3"
+              class="w-full"
+            />
+          </UFormField>
+        </template>
 
         <div v-if="result && result.erros > 0" class="space-y-2">
           <p class="text-sm font-medium text-error">
@@ -125,7 +169,8 @@ defineExpose({ show })
           @click="open = false"
         />
         <UButton
-          label="Manifestar"
+          v-if="elegiveis.length > 0"
+          :label="`Manifestar ${elegiveis.length} doc(s)`"
           color="primary"
           :loading="processing"
           icon="i-lucide-stamp"
