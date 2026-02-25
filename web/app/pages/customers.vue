@@ -4,12 +4,7 @@ import { upperFirst } from 'scule'
 import { getPaginationRowModel } from '@tanstack/table-core'
 import type { Row } from '@tanstack/table-core'
 import type { User } from '~/types'
-
-const UAvatar = resolveComponent('UAvatar')
-const UButton = resolveComponent('UButton')
-const UBadge = resolveComponent('UBadge')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
-const UCheckbox = resolveComponent('UCheckbox')
+import { UAvatar, UButton, UBadge, UDropdownMenu, UCheckbox } from '#components'
 
 const toast = useToast()
 const table = useTemplateRef('table')

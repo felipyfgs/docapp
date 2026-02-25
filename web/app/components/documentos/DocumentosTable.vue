@@ -5,6 +5,7 @@ import type { Row, Table } from '@tanstack/table-core'
 import type { DocumentoFiscal } from '~/types'
 import type { ColumnConfig } from '~/composables/useTableFilter'
 import { tableUI } from '~/composables/useTableHelpers'
+import { UBadge, UTooltip, UButton, UCheckbox, UDropdownMenu } from '#components'
 
 const props = defineProps<{
   data: DocumentoFiscal[] | null | undefined
@@ -19,11 +20,7 @@ const toast = useToast()
 const { formatBRL, formatCNPJ, tipoBadge, statusBadge, manifestacaoBadge } = useDocumentoFormatters()
 const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
-const UBadge = resolveComponent('UBadge')
-const UTooltip = resolveComponent('UTooltip')
-const UButton = resolveComponent('UButton')
-const UCheckbox = resolveComponent('UCheckbox')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
+
 
 const table = useTemplateRef<{ tableApi: Table<DocumentoFiscal> }>('table')
 

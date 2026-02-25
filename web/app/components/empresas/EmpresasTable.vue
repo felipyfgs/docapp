@@ -5,6 +5,7 @@ import type { Row, Table } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
 import type { ColumnConfig } from '~/composables/useTableFilter'
 import { tableUI } from '~/composables/useTableHelpers'
+import { UBadge, UButton, UCheckbox, UDropdownMenu } from '#components'
 
 const props = defineProps<{
   data: Empresa[] | null | undefined
@@ -21,10 +22,7 @@ const toast = useToast()
 const { formatCNPJ } = useDocumentoFormatters()
 const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
-const UBadge = resolveComponent('UBadge')
-const UButton = resolveComponent('UButton')
-const UCheckbox = resolveComponent('UCheckbox')
-const UDropdownMenu = resolveComponent('UDropdownMenu')
+
 
 const table = useTemplateRef<{ tableApi: Table<Empresa> }>('table')
 

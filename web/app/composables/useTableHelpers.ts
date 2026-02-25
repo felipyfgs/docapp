@@ -1,5 +1,6 @@
 import type { Column, Table } from '@tanstack/table-core'
 import { upperFirst } from 'scule'
+import { UButton } from '#components'
 
 export const tableUI = {
   base: 'table-fixed border-separate border-spacing-0',
@@ -12,7 +13,6 @@ export const tableUI = {
 
 export function useTableHelpers() {
   function sortableHeader<T>(label: string) {
-    const UButton = resolveComponent('UButton')
     return ({ column }: { column: Column<T> }) => {
       const isSorted = column.getIsSorted()
       return h(UButton, {
