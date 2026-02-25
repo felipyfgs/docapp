@@ -7,18 +7,18 @@
     },
     "context7": {
       "type": "stdio",
-      "command": "npx",
+      "command": "/home/felipe/.nvm/versions/node/v24.13.1/bin/npx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
       "disabled": true
     },
     "postgres": {
       "type": "stdio",
-      "command": "npx",
+      "command": "/home/felipe/.nvm/versions/node/v24.13.1/bin/npx",
       "args": ["-y", "@modelcontextprotocol/server-postgres", "postgresql://fiscal:fiscal@localhost:5432/fiscal"]
     },
     "playwright": {
       "type": "stdio",
-      "command": "npx",
+      "command": "/home/felipe/.nvm/versions/node/v24.13.1/bin/npx",
       "args": ["-y", "@playwright/mcp@latest"]
     }
   }

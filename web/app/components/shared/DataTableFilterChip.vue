@@ -48,16 +48,13 @@ const valueOpen = ref(false)
 
 <template>
   <div class="flex h-7 items-center rounded-full border border-border bg-background shadow-xs text-xs whitespace-nowrap">
-    <!-- Subject -->
     <div class="flex items-center gap-1 px-2.5 select-none">
       <UIcon :name="column.icon" class="size-3.5 text-muted" />
       <span class="font-medium text-default">{{ column.displayName }}</span>
     </div>
 
-    <!-- Separator -->
     <div class="w-px self-stretch bg-border" />
 
-    <!-- Operator -->
     <UPopover v-model:open="operatorOpen" :content="{ align: 'start', side: 'bottom' }">
       <button class="px-2 h-full hover:bg-elevated/80 text-muted transition-colors">
         {{ operatorLabel }}
@@ -77,23 +74,19 @@ const valueOpen = ref(false)
       </template>
     </UPopover>
 
-    <!-- Separator -->
     <div class="w-px self-stretch bg-border" />
 
-    <!-- Values -->
     <UPopover v-model:open="valueOpen" :content="{ align: 'start', side: 'bottom' }">
       <button class="px-2 h-full hover:bg-elevated/80 transition-colors max-w-40 truncate">
         {{ valuesLabel }}
       </button>
       <template #content>
-        <DocumentosFilterValuePicker :filter="filter" :column="column" :actions="actions" />
+        <SharedDataTableFilterValuePicker :filter="filter" :column="column" :actions="actions" />
       </template>
     </UPopover>
 
-    <!-- Separator -->
     <div class="w-px self-stretch bg-border" />
 
-    <!-- Remove -->
     <button
       class="px-2 h-full hover:bg-elevated/80 rounded-r-full transition-colors text-muted hover:text-default"
       @click="actions.removeFilter(filter.columnId)"

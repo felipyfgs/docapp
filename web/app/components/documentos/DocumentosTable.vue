@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import type { TableColumn } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
-import type { Column, Row, Table } from '@tanstack/table-core'
-import { upperFirst } from 'scule'
+import type { Row, Table } from '@tanstack/table-core'
 import type { DocumentoFiscal } from '~/types'
 import type { ColumnConfig } from '~/composables/useTableFilter'
+import { tableUI } from '~/composables/useTableHelpers'
 
 const props = defineProps<{
   data: DocumentoFiscal[] | null | undefined
@@ -17,7 +17,7 @@ const emit = defineEmits<{
 
 const toast = useToast()
 const { formatBRL, formatCNPJ, tipoBadge, statusBadge, manifestacaoBadge } = useDocumentoFormatters()
-const { sortableHeader } = useTableHelpers()
+const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
 const UBadge = resolveComponent('UBadge')
 const UTooltip = resolveComponent('UTooltip')
@@ -33,10 +33,7 @@ const columnVisibility = ref<Record<string, boolean>>({
   created_at: false
 })
 const rowSelection = ref<Record<string, boolean>>({})
-
 const pagination = ref({ pageIndex: 0, pageSize: 15 })
-
-const search = defineModel<string>('search', { default: '' })
 
 function dynamicOptions(extractor: (d: DocumentoFiscal) => string | undefined) {
   const all = [...new Set((props.data ?? []).map(extractor).filter(Boolean))]
@@ -50,6 +47,7 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     displayName: 'Tipo',
     icon: 'i-lucide-file-text',
     type: 'option',
+    defaultOpen: true,
     options: [
       { label: 'NF-e', value: 'nf-e' },
       { label: 'NFC-e', value: 'nfc-e' },
@@ -64,12 +62,22 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     displayName: 'Status',
     icon: 'i-lucide-circle-check',
     type: 'option',
+    defaultOpen: true,
     options: [
       { label: 'Autorizada', value: 'autorizada' },
       { label: 'Cancelada', value: 'cancelada' },
       { label: 'Denegada', value: 'denegada' },
       { label: 'Desconhecido', value: 'desconhecido' }
     ]
+  },
+  {
+    id: 'data_emissao',
+    accessor: row => row.data_emissao ?? null,
+    displayName: 'Emissão',
+    icon: 'i-lucide-calendar',
+    type: 'timerange',
+    defaultOpen: true,
+    commandDisabled: true
   },
   {
     id: 'emitente',
@@ -88,6 +96,16 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     options: dynamicOptions(d => d.destinatario_nome || undefined)
   },
   {
+    id: 'valor_total',
+    accessor: row => row.valor_total ?? 0,
+    displayName: 'Valor',
+    icon: 'i-lucide-dollar-sign',
+    type: 'slider',
+    min: 0,
+    max: 1000000,
+    commandDisabled: true
+  },
+  {
     id: 'xml_resumo',
     accessor: row => row.xml_resumo ? 'resumo' : 'completo',
     displayName: 'XML',
@@ -97,14 +115,6 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
       { label: 'Completo', value: 'completo' },
       { label: 'Resumo', value: 'resumo' }
     ]
-  },
-  {
-    id: 'competencia',
-    accessor: row => row.competencia ?? null,
-    displayName: 'Competência',
-    icon: 'i-lucide-calendar',
-    type: 'option',
-    options: dynamicOptions(d => d.competencia)
   },
   {
     id: 'manifestacao_status',
@@ -122,60 +132,41 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
   }
 ])
 
-const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
+const { filters, filteredData, hasFilters, activeFilterCount, facetedCounts, facetedMinMax, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
-function stripMask(s: string): string {
-  return s.replace(/[.\-/]/g, '')
-}
-
-const filtered = computed(() => {
-  const raw = search.value.toLowerCase().trim()
-  let result = filteredData.value
-
-  if (raw) {
-    const query = stripMask(raw)
-    result = result.filter((documento) => {
-      const values = [
-        documento.chave_acesso,
-        documento.numero_documento,
-        documento.emitente_nome,
-        documento.destinatario_nome,
-        documento.emitente_cnpj,
-        documento.destinatario_cnpj
-      ]
-      return values.some((value) => {
-        if (!value) return false
-        const lower = value.toLowerCase()
-        return lower.includes(raw) || stripMask(lower).includes(query)
-      })
-    })
-  }
-
-  return result
-})
+const filtered = computed(() => filteredData.value)
 
 const selectedRows = computed((): DocumentoFiscal[] => {
   if (!table.value?.tableApi) return []
   return table.value.tableApi.getFilteredSelectedRowModel().rows.map((row: Row<DocumentoFiscal>) => row.original)
 })
 
+const totalRows = computed(() => (props.data ?? []).length)
 const totalFilteredRows = computed(() => table.value?.tableApi?.getFilteredRowModel().rows.length ?? 0)
 const totalSelectedRows = computed(() => table.value?.tableApi?.getFilteredSelectedRowModel().rows.length ?? 0)
 
-defineExpose({ selectedRows, tableApi: computed(() => table.value?.tableApi) })
+defineExpose({
+  selectedRows,
+  tableApi: computed(() => table.value?.tableApi),
+  filterColumns,
+  filters,
+  filterActions,
+  hasFilters,
+  activeFilterCount,
+  facetedCounts,
+  facetedMinMax,
+  totalRows,
+  totalFilteredRows
+})
 
 function rowItems(row: Row<DocumentoFiscal>) {
   return [
-    [
-      { type: 'label' as const, label: 'Ações' }
-    ],
+    [{ type: 'label' as const, label: 'Ações' }],
     [
       {
         label: 'Ver XML',
         icon: 'i-lucide-file-code-2',
-        onSelect() {
-          emit('viewXml', row.original)
-        }
+        onSelect() { emit('viewXml', row.original) }
       },
       {
         label: 'Copiar chave',
@@ -196,9 +187,7 @@ const columns: TableColumn<DocumentoFiscal>[] = [
     enableSorting: false,
     header: ({ table }) =>
       h(UCheckbox, {
-        'modelValue': table.getIsSomePageRowsSelected()
-          ? 'indeterminate'
-          : table.getIsAllPageRowsSelected(),
+        'modelValue': table.getIsSomePageRowsSelected() ? 'indeterminate' : table.getIsAllPageRowsSelected(),
         'onUpdate:modelValue': (value: boolean | 'indeterminate') => table.toggleAllPageRowsSelected(!!value),
         'ariaLabel': 'Selecionar todos'
       }),
@@ -256,7 +245,6 @@ const columns: TableColumn<DocumentoFiscal>[] = [
     header: sortableHeader('Destinatário'),
     cell: ({ row }) => h('span', { class: 'text-sm font-mono whitespace-nowrap' }, formatCNPJ(row.original.destinatario_cnpj) || '—')
   },
-
   {
     accessorKey: 'status_documento',
     header: sortableHeader('Status'),
@@ -330,49 +318,22 @@ const columnLabels: Record<string, string> = {
   data_emissao: 'Emissão',
   created_at: 'Recebido'
 }
-
-function getVisibilityItems() {
-  if (!table.value?.tableApi) return []
-
-  return table.value.tableApi
-    .getAllColumns()
-    .filter((column: Column<DocumentoFiscal>) => column.getCanHide())
-    .map((column: Column<DocumentoFiscal>) => ({
-      label: columnLabels[column.id] || upperFirst(column.id),
-      type: 'checkbox' as const,
-      checked: column.getIsVisible(),
-      onUpdateChecked(checked: boolean) {
-        table.value?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-      },
-      onSelect(event?: Event) {
-        event?.preventDefault()
-      }
-    }))
-}
 </script>
 
 <template>
-  <!-- Toolbar: search + filter + chips + actions + columns -->
-  <div class="flex items-center gap-2">
-    <UInput
-      v-model="search"
-      icon="i-lucide-search"
-      placeholder="Emitente, destinatário, chave, número..."
-      class="w-64 shrink-0"
-    />
-
-    <DocumentosDataTableFilter
-      :columns="filterColumns"
-      :filters="filters"
-      :actions="filterActions"
-      class="min-w-0"
-    />
-
-    <div class="flex items-center gap-2 ml-auto shrink-0">
+  <SharedDataTableToolbar
+    :columns="filterColumns"
+    :actions="filterActions"
+    :total-rows="totalRows"
+    :filtered-rows="filtered.length"
+    :has-filters="hasFilters"
+    :active-filter-count="activeFilterCount"
+  >
+    <template #actions>
       <slot name="actions" :selected-rows="selectedRows" />
 
       <UDropdownMenu
-        :items="getVisibilityItems()"
+        :items="getVisibilityItems(table?.tableApi, columnLabels)"
         :content="{ align: 'end' }"
       >
         <UButton
@@ -382,8 +343,8 @@ function getVisibilityItems() {
           label="Colunas"
         />
       </UDropdownMenu>
-    </div>
-  </div>
+    </template>
+  </SharedDataTableToolbar>
 
   <UTable
     ref="table"
@@ -397,14 +358,7 @@ function getVisibilityItems() {
     :loading="status === 'pending'"
     sticky
     class="shrink-0"
-    :ui="{
-      base: 'table-fixed border-separate border-spacing-0',
-      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-      tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'px-3 py-2 text-xs first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'px-3 py-2 text-sm border-b border-default',
-      separator: 'h-0'
-    }"
+    :ui="tableUI"
   />
 
   <ClientOnly>

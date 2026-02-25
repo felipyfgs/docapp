@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { TableColumn, TableRow } from '@nuxt/ui'
 import { getPaginationRowModel } from '@tanstack/table-core'
-import type { Column, Row, Table } from '@tanstack/table-core'
+import type { Row, Table } from '@tanstack/table-core'
 import type { Empresa } from '~/types'
+import type { ColumnConfig } from '~/composables/useTableFilter'
+import { tableUI } from '~/composables/useTableHelpers'
 
 const props = defineProps<{
   data: Empresa[] | null | undefined
@@ -16,6 +18,8 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const { formatCNPJ } = useDocumentoFormatters()
+const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
 const UBadge = resolveComponent('UBadge')
 const UButton = resolveComponent('UButton')
@@ -31,32 +35,70 @@ const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageIndex: 0, pageSize: 10 })
 
 const search = defineModel<string>('search', { default: '' })
-const situacaoFilter = defineModel<string>('situacaoFilter', { default: 'all' })
+
+function dynamicOptions(extractor: (e: Empresa) => string | undefined) {
+  const all = [...new Set((props.data ?? []).map(extractor).filter(Boolean))]
+  return all.sort().map(v => ({ label: v!, value: v! }))
+}
+
+const filterColumns = computed<ColumnConfig<Empresa>[]>(() => [
+  {
+    id: 'situacao_cadastral',
+    accessor: row => row.situacao_cadastral,
+    displayName: 'Situação',
+    icon: 'i-lucide-circle-check',
+    type: 'option',
+    options: [
+      { label: 'Ativa', value: 'Ativa' },
+      { label: 'Baixada', value: 'Baixada' },
+      { label: 'Suspensa', value: 'Suspensa' },
+      { label: 'Inapta', value: 'Inapta' }
+    ]
+  },
+  {
+    id: 'certificado',
+    accessor: row => row.certificado_status || 'sem_certificado',
+    displayName: 'Certificado',
+    icon: 'i-lucide-shield',
+    type: 'option',
+    options: [
+      { label: 'Válido', value: 'valido' },
+      { label: 'Vencido', value: 'vencido' },
+      { label: 'Prestes a vencer', value: 'prestes_a_vencer' },
+      { label: 'Sem certificado', value: 'sem_certificado' }
+    ]
+  },
+  {
+    id: 'estado',
+    accessor: row => row.estado || '',
+    displayName: 'Estado',
+    icon: 'i-lucide-map-pin',
+    type: 'option',
+    options: dynamicOptions(e => e.estado || undefined)
+  }
+])
+
+const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
 const filtered = computed(() => {
   const q = search.value.toLowerCase()
-  let result = props.data ?? []
+  if (!q) return filteredData.value
 
-  if (q) {
-    result = result.filter(e =>
-      e.cnpj.includes(q)
-      || e.razao_social.toLowerCase().includes(q)
-      || e.nome_fantasia?.toLowerCase().includes(q)
-      || e.cidade?.toLowerCase().includes(q)
-    )
-  }
-
-  if (situacaoFilter.value && situacaoFilter.value !== 'all') {
-    result = result.filter(e => e.situacao_cadastral === situacaoFilter.value)
-  }
-
-  return result
+  return filteredData.value.filter(e =>
+    e.cnpj.includes(q)
+    || e.razao_social.toLowerCase().includes(q)
+    || e.nome_fantasia?.toLowerCase().includes(q)
+    || e.cidade?.toLowerCase().includes(q)
+  )
 })
 
 const selectedRows = computed((): Empresa[] => {
   if (!table.value?.tableApi) return []
   return table.value.tableApi.getFilteredSelectedRowModel().rows.map((r: Row<Empresa>) => r.original)
 })
+
+const totalFilteredRows = computed(() => table.value?.tableApi?.getFilteredRowModel().rows.length ?? 0)
+const totalSelectedRows = computed(() => table.value?.tableApi?.getFilteredSelectedRowModel().rows.length ?? 0)
 
 defineExpose({ selectedRows, tableApi: computed(() => table.value?.tableApi) })
 
@@ -104,15 +146,11 @@ function rowItems(row: Row<Empresa>) {
   ]
 }
 
-function formatCNPJ(cnpj: string): string {
-  const d = cnpj.replace(/\D/g, '')
-  if (d.length !== 14) return cnpj
-  return `${d.slice(0, 2)}.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-${d.slice(12)}`
-}
-
 const columns: TableColumn<Empresa>[] = [
   {
     id: 'select',
+    enableHiding: false,
+    enableSorting: false,
     header: ({ table }) =>
       h(UCheckbox, {
         'modelValue': table.getIsSomePageRowsSelected()
@@ -131,21 +169,7 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     accessorKey: 'razao_social',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Empresa',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Empresa'),
     cell: ({ row }) => h('div', { class: 'min-w-48 max-w-64' }, [
       h('p', { class: 'font-medium text-highlighted truncate' }, row.original.razao_social),
       h('p', { class: 'text-xs text-muted' }, formatCNPJ(row.original.cnpj))
@@ -153,21 +177,7 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     accessorKey: 'situacao_cadastral',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Situação',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Situação'),
     cell: ({ row }) => {
       const s = row.original.situacao_cadastral
       const isAtiva = s === 'Ativa'
@@ -181,21 +191,7 @@ const columns: TableColumn<Empresa>[] = [
   {
     id: 'localidade',
     accessorFn: row => `${row.cidade || ''}${row.estado || ''}`,
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Cidade/UF',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Cidade/UF'),
     cell: ({ row }) => {
       const { cidade, estado } = row.original
       if (!cidade && !estado) return '—'
@@ -208,21 +204,7 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     accessorKey: 'lookback_days',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Período',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Período'),
     cell: ({ row }) => {
       return h('div', { class: 'flex items-center gap-1' }, [
         h('span', { class: 'i-lucide-calendar size-3 text-muted shrink-0' }),
@@ -233,21 +215,7 @@ const columns: TableColumn<Empresa>[] = [
   {
     id: 'certificado',
     accessorFn: row => row.certificado_status || 'sem_certificado',
-    header: ({ column }) => {
-      const isSorted = column.getIsSorted()
-      return h(UButton, {
-        color: 'neutral',
-        variant: 'ghost',
-        label: 'Certificado',
-        icon: isSorted
-          ? isSorted === 'asc'
-            ? 'i-lucide-arrow-up-narrow-wide'
-            : 'i-lucide-arrow-down-wide-narrow'
-          : 'i-lucide-arrow-up-down',
-        class: '-mx-2.5',
-        onClick: () => column.toggleSorting(column.getIsSorted() === 'asc')
-      })
-    },
+    header: sortableHeader('Certificado'),
     cell: ({ row }) => {
       const status = row.original.certificado_status
       type CertColor = 'error' | 'warning' | 'success' | 'neutral'
@@ -279,6 +247,8 @@ const columns: TableColumn<Empresa>[] = [
   },
   {
     id: 'actions',
+    enableHiding: false,
+    meta: { class: { td: 'text-right' } },
     cell: ({ row }) =>
       h('div', { class: 'text-right' },
         h(UDropdownMenu, {
@@ -301,61 +271,36 @@ const columnLabels: Record<string, string> = {
   lookback_days: 'Período',
   certificado: 'Certificado'
 }
-
-function getVisibilityItems() {
-  if (!table.value?.tableApi) return []
-  return table.value.tableApi
-    .getAllColumns()
-    .filter((column: Column<Empresa>) => column.getCanHide())
-    .map((column: Column<Empresa>) => ({
-      label: columnLabels[column.id] ?? column.id,
-      type: 'checkbox' as const,
-      checked: column.getIsVisible(),
-      onUpdateChecked(checked: boolean) {
-        table.value?.tableApi?.getColumn(column.id)?.toggleVisibility(!!checked)
-      },
-      onSelect(e?: Event) {
-        e?.preventDefault()
-      }
-    }))
-}
 </script>
 
 <template>
-  <div class="flex flex-wrap items-center justify-between gap-1.5">
+  <div class="flex items-center gap-2">
     <UInput
       v-model="search"
       icon="i-lucide-search"
       placeholder="Filtrar por CNPJ, razão social, cidade..."
-      class="max-w-sm"
+      class="w-64 shrink-0"
     />
 
-    <div class="flex flex-wrap items-center gap-1.5">
+    <SharedDataTableFilter
+      :columns="filterColumns"
+      :filters="filters"
+      :actions="filterActions"
+      class="min-w-0"
+    />
+
+    <div class="flex items-center gap-2 ml-auto shrink-0">
       <slot name="actions" :selected-rows="selectedRows" />
 
-      <USelect
-        v-model="situacaoFilter"
-        :items="[
-          { label: 'Todas', value: 'all' },
-          { label: 'Ativa', value: 'Ativa' },
-          { label: 'Baixada', value: 'Baixada' },
-          { label: 'Suspensa', value: 'Suspensa' },
-          { label: 'Inapta', value: 'Inapta' }
-        ]"
-        :ui="{ trailingIcon: 'group-data-[state=open]:rotate-180 transition-transform duration-200' }"
-        placeholder="Situação"
-        class="min-w-28"
-      />
-
       <UDropdownMenu
-        :items="getVisibilityItems()"
+        :items="getVisibilityItems(table?.tableApi, columnLabels)"
         :content="{ align: 'end' }"
       >
         <UButton
-          label="Exibir"
           color="neutral"
           variant="outline"
-          trailing-icon="i-lucide-settings-2"
+          icon="i-lucide-columns-3"
+          label="Colunas"
         />
       </UDropdownMenu>
     </div>
@@ -371,29 +316,46 @@ function getVisibilityItems() {
     :data="filtered"
     :columns="columns"
     :loading="status === 'pending'"
+    sticky
     class="shrink-0"
     :ui="{
-      base: 'table-fixed border-separate border-spacing-0',
-      thead: '[&>tr]:bg-elevated/50 [&>tr]:after:content-none',
-      tbody: '[&>tr]:last:[&>td]:border-b-0',
-      th: 'py-2 first:rounded-l-lg last:rounded-r-lg border-y border-default first:border-l last:border-r',
-      td: 'border-b border-default',
-      separator: 'h-0',
+      ...tableUI,
       tr: 'cursor-pointer hover:bg-elevated/40 transition-colors'
     }"
     @select="(_: Event, row: TableRow<Empresa>) => navigateTo(`/empresas/${row.original.id}`)"
   />
 
-  <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
-    <div class="text-sm text-muted">
-      {{ table?.tableApi?.getFilteredSelectedRowModel().rows.length || 0 }} de
-      {{ table?.tableApi?.getFilteredRowModel().rows.length || 0 }} linha(s) selecionada(s).
+  <ClientOnly>
+    <div class="flex items-center justify-between gap-3 border-t border-default pt-4 mt-auto">
+      <div class="flex items-center gap-3 text-sm text-muted">
+        <span>
+          {{ totalSelectedRows }} de
+          {{ totalFilteredRows }} linha(s) selecionada(s).
+        </span>
+
+        <div class="flex items-center gap-1.5">
+          <span>Linhas</span>
+          <USelect
+            :model-value="String(pagination.pageSize)"
+            :items="[
+              { label: '10', value: '10' },
+              { label: '15', value: '15' },
+              { label: '25', value: '25' },
+              { label: '50', value: '50' },
+              { label: '100', value: '100' }
+            ]"
+            class="w-20"
+            @update:model-value="(val: string) => { pagination = { pageIndex: 0, pageSize: Number(val) } }"
+          />
+        </div>
+      </div>
+
+      <UPagination
+        :page="pagination.pageIndex + 1"
+        :items-per-page="pagination.pageSize"
+        :total="totalFilteredRows"
+        @update:page="(page: number) => { pagination = { ...pagination, pageIndex: page - 1 } }"
+      />
     </div>
-    <UPagination
-      :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
-      :items-per-page="table?.tableApi?.getState().pagination.pageSize"
-      :total="table?.tableApi?.getFilteredRowModel().rows.length"
-      @update:page="(p: number) => table?.tableApi?.setPageIndex(p - 1)"
-    />
-  </div>
+  </ClientOnly>
 </template>

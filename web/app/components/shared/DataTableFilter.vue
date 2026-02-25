@@ -10,14 +10,14 @@ defineProps<{
 
 <template>
   <div class="flex items-center gap-2 min-w-0">
-    <DocumentosFilterSelector
+    <SharedDataTableFilterSelector
       :columns="columns"
       :filters="filters"
       :actions="actions"
     />
 
     <div v-if="filters.length > 0" class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar py-1">
-      <DocumentosFilterChip
+      <SharedDataTableFilterChip
         v-for="filter in filters"
         :key="filter.columnId"
         :filter="filter"

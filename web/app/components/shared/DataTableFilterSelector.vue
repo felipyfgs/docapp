@@ -85,7 +85,6 @@ watch(open, (val) => {
     />
 
     <template #content>
-      <!-- Column value picker (drill-down) -->
       <template v-if="selectedColumn && selectedFilter">
         <div class="flex items-center gap-1 px-2 py-1.5 border-b border-default">
           <button
@@ -97,14 +96,13 @@ watch(open, (val) => {
             <span>{{ selectedColumn.displayName }}</span>
           </button>
         </div>
-        <DocumentosFilterValuePicker
+        <SharedDataTableFilterValuePicker
           :filter="selectedFilter"
           :column="selectedColumn"
           :actions="actions"
         />
       </template>
 
-      <!-- Column picker -->
       <template v-else>
         <div class="p-2 border-b border-default">
           <UInput
@@ -118,7 +116,6 @@ watch(open, (val) => {
         </div>
 
         <ul class="max-h-64 overflow-y-auto py-1 w-52">
-          <!-- QuickSearch: show matching option values -->
           <template v-if="showQuickSearch">
             <li
               v-for="item in quickSearchResults"
@@ -133,7 +130,6 @@ watch(open, (val) => {
             </li>
           </template>
 
-          <!-- Regular column list -->
           <template v-else>
             <li
               v-for="col in filteredColumns"
