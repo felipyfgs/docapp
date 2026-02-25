@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { h, resolveComponent } from 'vue'
 import type { TableColumn } from '@nuxt/ui'
 import type { Period, Range, Sale } from '~/types'
+import { UBadge } from '#components'
 
 const props = defineProps<{
   period: Period
   range: Range
 }>()
-
-const UBadge = resolveComponent('UBadge')
 
 const sampleEmails = [
   'james.anderson@example.com',

@@ -38,7 +38,7 @@ function toggleOption(value: string) {
 </script>
 
 <template>
-  <div class="w-52">
+  <div class="w-72">
     <div class="p-2 border-b border-default">
       <UInput
         v-model="search"

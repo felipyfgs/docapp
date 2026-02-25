@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, resolveComponent } from 'vue'
+import { UBadge } from '#components'
 import { VisXYContainer, VisGroupedBar, VisLine, VisAxis, VisCrosshair, VisTooltip } from '@unovis/vue'
 import { format, parseISO } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -171,7 +171,7 @@ function statusColor(s: string) {
   return (m[s] ?? 'neutral') as 'success' | 'error' | 'warning' | 'neutral'
 }
 
-const UBadge = resolveComponent('UBadge')
+
 const tableColumns: TableColumn<DocumentoFiscal>[] = [
   {
     accessorKey: 'emitente_nome',
