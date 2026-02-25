@@ -115,7 +115,7 @@ watch(open, (val) => {
           />
         </div>
 
-        <ul class="max-h-64 overflow-y-auto py-1 w-52">
+        <ul class="max-h-64 overflow-y-auto py-1 w-72">
           <template v-if="showQuickSearch">
             <li
               v-for="item in quickSearchResults"
@@ -124,9 +124,9 @@ watch(open, (val) => {
               @click="quickSelectOption(item.column, item.option.value)"
             >
               <UIcon :name="item.column.icon" class="size-4 text-muted shrink-0" />
-              <span class="text-muted">{{ item.column.displayName }}</span>
+              <span class="text-muted shrink-0">{{ item.column.displayName }}</span>
               <UIcon name="i-lucide-chevron-right" class="size-3 text-muted/60 shrink-0" />
-              <span>{{ item.option.label }}</span>
+              <span class="truncate">{{ item.option.label }}</span>
             </li>
           </template>
 

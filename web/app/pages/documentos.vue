@@ -1,32 +1,14 @@
 <script setup lang="ts">
 import type { DocumentoExportResponse, DocumentoFiscal, DocumentoListResponse, DocumentoXMLResponse } from '~/types'
-import type { ColumnConfigBase, DataTableFilterActions, FiltersState } from '~/composables/useTableFilter'
 
 type DeliveryMode = 'proxy' | 'presigned'
 type ExportFormat = 'xml' | 'danfe' | 'ambos'
 type OrganizationMode = 'tipo/competencia/cnpj' | 'cnpj/competencia/tipo' | 'competencia/cnpj/tipo'
 
 const toast = useToast()
-const { open: filterControlsOpen } = useFilterControls()
-
-const isSmallScreen = ref(false)
-onMounted(() => {
-  const mq = window.matchMedia('(max-width: 639px)')
-  isSmallScreen.value = mq.matches
-  const handler = (e: MediaQueryListEvent) => {
-    isSmallScreen.value = e.matches
-  }
-  mq.addEventListener('change', handler)
-  onUnmounted(() => mq.removeEventListener('change', handler))
-})
 
 const tableRef = useTemplateRef<{
   selectedRows: DocumentoFiscal[]
-  filterColumns: ColumnConfigBase[]
-  filters: FiltersState
-  filterActions: DataTableFilterActions
-  facetedCounts: Record<string, Map<string, number>>
-  facetedMinMax: Record<string, [number, number]>
 }>('table')
 
 const { data, status, refresh } = await useFetch<DocumentoListResponse>('/api/documentos', {
@@ -351,70 +333,26 @@ function downloadBlob(blob: Blob, fileName: string) {
     </template>
 
     <template #body>
-      <div class="flex h-full overflow-hidden">
-        <!-- Desktop sidebar -->
-        <aside
-          v-if="filterControlsOpen"
-          class="hidden sm:flex shrink-0 w-64 flex-col border-r border-default"
-        >
-          <div class="flex items-center justify-between px-3 py-2 border-b border-default shrink-0">
-            <span class="text-sm font-semibold">
-              Filtros
-            </span>
-          </div>
-          <SharedDataTableFilterControls
-            v-if="tableRef"
-            :columns="tableRef.filterColumns ?? []"
-            :filters="tableRef.filters ?? []"
-            :actions="tableRef.filterActions ?? {}"
-            :faceted-counts="tableRef.facetedCounts ?? {}"
-            :faceted-min-max="tableRef.facetedMinMax ?? {}"
-          />
-        </aside>
-
-        <!-- Mobile drawer -->
-        <USlideover
-          v-if="isSmallScreen"
-          v-model:open="filterControlsOpen"
-          side="left"
-          title="Filtros"
-          :ui="{ content: 'w-[280px] max-w-[80vw]' }"
-        >
-          <template #body>
-            <SharedDataTableFilterControls
-              v-if="tableRef"
-              :columns="tableRef.filterColumns ?? []"
-              :filters="tableRef.filters ?? []"
-              :actions="tableRef.filterActions ?? {}"
-              :faceted-counts="tableRef.facetedCounts ?? {}"
-              :faceted-min-max="tableRef.facetedMinMax ?? {}"
-            />
-          </template>
-        </USlideover>
-
-        <div class="flex-1 min-w-0 flex flex-col gap-4 p-4 overflow-auto">
-          <DocumentosTable
-            ref="table"
-            :data="documentos"
-            :status="status"
-            @view-xml="handleViewXML"
+      <DocumentosTable
+        ref="table"
+        :data="documentos"
+        :status="status"
+        @view-xml="handleViewXML"
+      >
+        <template #actions>
+          <UButton
+            v-if="selectedCount > 0"
+            label="Exportar"
+            color="primary"
+            icon="i-lucide-download"
+            @click="openExportModal"
           >
-            <template #actions>
-              <UButton
-                v-if="selectedCount > 0"
-                label="Exportar"
-                color="primary"
-                icon="i-lucide-download"
-                @click="openExportModal"
-              >
-                <template #trailing>
-                  <UKbd>{{ selectedCount }}</UKbd>
-                </template>
-              </UButton>
+            <template #trailing>
+              <UKbd>{{ selectedCount }}</UKbd>
             </template>
-          </DocumentosTable>
-        </div>
-      </div>
+          </UButton>
+        </template>
+      </DocumentosTable>
     </template>
   </UDashboardPanel>
 

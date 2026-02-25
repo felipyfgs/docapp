@@ -20,8 +20,6 @@ const toast = useToast()
 const { formatBRL, formatCNPJ, tipoBadge, statusBadge, manifestacaoBadge } = useDocumentoFormatters()
 const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
-
-
 const table = useTemplateRef<{ tableApi: Table<DocumentoFiscal> }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])
@@ -31,6 +29,8 @@ const columnVisibility = ref<Record<string, boolean>>({
 })
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageIndex: 0, pageSize: 15 })
+
+const search = ref('')
 
 function dynamicOptions(extractor: (d: DocumentoFiscal) => string | undefined) {
   const all = [...new Set((props.data ?? []).map(extractor).filter(Boolean))]
@@ -44,7 +44,6 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     displayName: 'Tipo',
     icon: 'i-lucide-file-text',
     type: 'option',
-    defaultOpen: true,
     options: [
       { label: 'NF-e', value: 'nf-e' },
       { label: 'NFC-e', value: 'nfc-e' },
@@ -59,7 +58,6 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     displayName: 'Status',
     icon: 'i-lucide-circle-check',
     type: 'option',
-    defaultOpen: true,
     options: [
       { label: 'Autorizada', value: 'autorizada' },
       { label: 'Cancelada', value: 'cancelada' },
@@ -68,50 +66,12 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     ]
   },
   {
-    id: 'data_emissao',
-    accessor: row => row.data_emissao ?? null,
-    displayName: 'Emissão',
-    icon: 'i-lucide-calendar',
-    type: 'timerange',
-    defaultOpen: true,
-    commandDisabled: true
-  },
-  {
     id: 'emitente',
     accessor: row => row.emitente_nome || '',
     displayName: 'Emitente',
     icon: 'i-lucide-building',
     type: 'option',
     options: dynamicOptions(d => d.emitente_nome || undefined)
-  },
-  {
-    id: 'destinatario',
-    accessor: row => row.destinatario_nome || '',
-    displayName: 'Destinatário',
-    icon: 'i-lucide-user',
-    type: 'option',
-    options: dynamicOptions(d => d.destinatario_nome || undefined)
-  },
-  {
-    id: 'valor_total',
-    accessor: row => row.valor_total ?? 0,
-    displayName: 'Valor',
-    icon: 'i-lucide-dollar-sign',
-    type: 'slider',
-    min: 0,
-    max: 1000000,
-    commandDisabled: true
-  },
-  {
-    id: 'xml_resumo',
-    accessor: row => row.xml_resumo ? 'resumo' : 'completo',
-    displayName: 'XML',
-    icon: 'i-lucide-file-code',
-    type: 'option',
-    options: [
-      { label: 'Completo', value: 'completo' },
-      { label: 'Resumo', value: 'resumo' }
-    ]
   },
   {
     id: 'manifestacao_status',
@@ -129,31 +89,31 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
   }
 ])
 
-const { filters, filteredData, hasFilters, activeFilterCount, facetedCounts, facetedMinMax, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
+const { filters, filteredData, actions: filterActions } = useTableFilter(filterColumns, () => props.data ?? [])
 
-const filtered = computed(() => filteredData.value)
+const filtered = computed(() => {
+  const q = search.value.toLowerCase()
+  if (!q) return filteredData.value
+
+  return filteredData.value.filter(d =>
+    d.chave_acesso?.includes(q)
+    || d.emitente_nome?.toLowerCase().includes(q)
+    || d.emitente_cnpj?.includes(q)
+    || d.destinatario_cnpj?.includes(q)
+    || d.numero_documento?.toString().includes(q)
+  )
+})
 
 const selectedRows = computed((): DocumentoFiscal[] => {
   if (!table.value?.tableApi) return []
   return table.value.tableApi.getFilteredSelectedRowModel().rows.map((row: Row<DocumentoFiscal>) => row.original)
 })
 
-const totalRows = computed(() => (props.data ?? []).length)
 const totalFilteredRows = computed(() => table.value?.tableApi?.getFilteredRowModel().rows.length ?? 0)
 const totalSelectedRows = computed(() => table.value?.tableApi?.getFilteredSelectedRowModel().rows.length ?? 0)
 
 defineExpose({
-  selectedRows,
-  tableApi: computed(() => table.value?.tableApi),
-  filterColumns,
-  filters,
-  filterActions,
-  hasFilters,
-  activeFilterCount,
-  facetedCounts,
-  facetedMinMax,
-  totalRows,
-  totalFilteredRows
+  selectedRows
 })
 
 function rowItems(row: Row<DocumentoFiscal>) {
@@ -198,6 +158,7 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   {
     accessorKey: 'tipo_documento',
     header: sortableHeader('Tipo'),
+    filterFn: 'equals',
     cell: ({ row }) => {
       const tipo = tipoBadge(row.original)
       return h(UBadge, { variant: 'subtle', color: tipo.color }, () => tipo.label)
@@ -245,6 +206,7 @@ const columns: TableColumn<DocumentoFiscal>[] = [
   {
     accessorKey: 'status_documento',
     header: sortableHeader('Status'),
+    filterFn: 'equals',
     cell: ({ row }) => {
       const status = statusBadge(row.original)
       return h(UBadge, { variant: 'subtle', color: status.color }, () => status.label)
@@ -318,15 +280,22 @@ const columnLabels: Record<string, string> = {
 </script>
 
 <template>
-  <SharedDataTableToolbar
-    :columns="filterColumns"
-    :actions="filterActions"
-    :total-rows="totalRows"
-    :filtered-rows="filtered.length"
-    :has-filters="hasFilters"
-    :active-filter-count="activeFilterCount"
-  >
-    <template #actions>
+  <div class="flex items-center gap-2">
+    <UInput
+      v-model="search"
+      icon="i-lucide-search"
+      placeholder="Filtrar por chave, emitente, CNPJ..."
+      class="w-64 shrink-0"
+    />
+
+    <SharedDataTableFilter
+      :columns="filterColumns"
+      :filters="filters"
+      :actions="filterActions"
+      class="min-w-0"
+    />
+
+    <div class="flex items-center gap-2 ml-auto shrink-0">
       <slot name="actions" :selected-rows="selectedRows" />
 
       <UDropdownMenu
@@ -340,8 +309,8 @@ const columnLabels: Record<string, string> = {
           label="Colunas"
         />
       </UDropdownMenu>
-    </template>
-  </SharedDataTableToolbar>
+    </div>
+  </div>
 
   <UTable
     ref="table"
@@ -376,8 +345,7 @@ const columnLabels: Record<string, string> = {
               { label: '25', value: '25' },
               { label: '50', value: '50' },
               { label: '100', value: '100' },
-              { label: '200', value: '200' },
-              { label: 'Todos', value: String(totalFilteredRows || 9999) }
+              { label: '200', value: '200' }
             ]"
             class="w-20"
             @update:model-value="(val: string) => { pagination = { pageIndex: 0, pageSize: Number(val) } }"
