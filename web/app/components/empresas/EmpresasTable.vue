@@ -22,8 +22,6 @@ const toast = useToast()
 const { formatCNPJ } = useDocumentoFormatters()
 const { sortableHeader, getVisibilityItems } = useTableHelpers()
 
-
-
 const table = useTemplateRef<{ tableApi: Table<Empresa> }>('table')
 
 const columnFilters = ref<{ id: string, value: string }[]>([])

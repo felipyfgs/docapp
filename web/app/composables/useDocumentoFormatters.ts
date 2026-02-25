@@ -1,3 +1,5 @@
+import { format, parseISO } from 'date-fns'
+import { ptBR } from 'date-fns/locale'
 import type { DocumentoFiscal } from '~/types'
 
 export function useDocumentoFormatters() {
@@ -14,6 +16,24 @@ export function useDocumentoFormatters() {
       return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
     }
     return cnpj || '—'
+  }
+
+  function formatDate(iso: string | undefined): string {
+    if (!iso) return '—'
+    try {
+      return format(parseISO(iso), 'dd/MM/yyyy HH:mm', { locale: ptBR })
+    } catch {
+      return iso
+    }
+  }
+
+  function formatDateOnly(iso: string | undefined): string {
+    if (!iso) return '—'
+    try {
+      return format(parseISO(iso), 'dd/MM/yyyy', { locale: ptBR })
+    } catch {
+      return iso
+    }
   }
 
   function tipoBadge(documento: DocumentoFiscal) {
@@ -48,5 +68,25 @@ export function useDocumentoFormatters() {
     return map[status as keyof typeof map] ?? { label: status, color: 'neutral' as const }
   }
 
-  return { formatBRL, formatCNPJ, tipoBadge, statusBadge, manifestacaoBadge }
+  function certBadge(status: string | undefined) {
+    const key = status ?? 'sem_certificado'
+    const colorMap: Record<string, string> = {
+      valido: 'success',
+      prestes_a_vencer: 'warning',
+      vencido: 'error',
+      sem_certificado: 'neutral'
+    }
+    const labelMap: Record<string, string> = {
+      valido: 'Válido',
+      prestes_a_vencer: 'Prestes a vencer',
+      vencido: 'Vencido',
+      sem_certificado: 'Sem certificado'
+    }
+    return {
+      color: colorMap[key] ?? 'neutral',
+      label: labelMap[key] ?? '—'
+    }
+  }
+
+  return { formatBRL, formatCNPJ, formatDate, formatDateOnly, tipoBadge, statusBadge, manifestacaoBadge, certBadge }
 }
