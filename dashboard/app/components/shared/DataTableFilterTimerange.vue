@@ -67,12 +67,15 @@ const presets = computed<Preset[]>(() => {
   const prevMonthStart = formatDate(new Date(now.getFullYear(), now.getMonth() - 1, 1))
   const prevMonthEnd = formatDate(new Date(now.getFullYear(), now.getMonth(), 0))
 
+  const threeMonthsAgoStart = formatDate(new Date(now.getFullYear(), now.getMonth() - 3, 1))
+
   return [
     { label: 'Hoje', from: today, to: today },
     { label: '7 dias', from: daysAgo(7), to: today },
     { label: '30 dias', from: daysAgo(30), to: today },
     { label: 'Este mês', from: startOfMonth, to: today },
-    { label: 'Mês passado', from: prevMonthStart, to: prevMonthEnd }
+    { label: 'Mês passado', from: prevMonthStart, to: prevMonthEnd },
+    { label: 'Últimos 3 meses', from: threeMonthsAgoStart, to: today }
   ]
 })
 

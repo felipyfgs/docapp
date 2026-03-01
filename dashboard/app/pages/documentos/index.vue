@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { DocumentoFiscal } from '~/types'
 
-const documentos = inject<ComputedRef<DocumentoFiscal[]>>('documentos', computed(() => []))
+const allDocumentos = inject<ComputedRef<DocumentoFiscal[]>>('documentos', computed(() => []))
 const status = inject<Ref<string>>('documentosStatus', ref('idle'))
 const refresh = inject<() => Promise<void>>('documentosRefresh', async () => {})
+
+const documentos = computed(() => allDocumentos.value.filter(d => !d.xml_resumo))
 
 const tableRef = useTemplateRef<{ selectedRows: DocumentoFiscal[] }>('table')
 const exportModalRef = useTemplateRef<{ show: () => void }>('exportModal')

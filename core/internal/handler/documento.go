@@ -63,14 +63,35 @@ func (h *DocumentoHandler) List(w http.ResponseWriter, r *http.Request) {
 		xmlResumo = &parsed
 	}
 
+	var dataInicio, dataFim *time.Time
+	if raw := strings.TrimSpace(r.URL.Query().Get("data_inicio")); raw != "" {
+		parsed, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "data_inicio inválido. Use YYYY-MM-DD."})
+			return
+		}
+		dataInicio = &parsed
+	}
+	if raw := strings.TrimSpace(r.URL.Query().Get("data_fim")); raw != "" {
+		parsed, err := time.Parse("2006-01-02", raw)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"message": "data_fim inválido. Use YYYY-MM-DD."})
+			return
+		}
+		endOfDay := parsed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+		dataFim = &endOfDay
+	}
+
 	docs, total, err := h.svc.List(service.DocumentoListFilter{
-		Search:    r.URL.Query().Get("search"),
-		Tipo:      r.URL.Query().Get("tipo"),
-		Status:    r.URL.Query().Get("status"),
-		EmpresaID: empresaID,
-		XMLResumo: xmlResumo,
-		Page:      page,
-		PageSize:  pageSize,
+		Search:     r.URL.Query().Get("search"),
+		Tipo:       r.URL.Query().Get("tipo"),
+		Status:     r.URL.Query().Get("status"),
+		EmpresaID:  empresaID,
+		XMLResumo:  xmlResumo,
+		DataInicio: dataInicio,
+		DataFim:    dataFim,
+		Page:       page,
+		PageSize:   pageSize,
 	})
 	if err != nil {
 		h.log.Error().Err(err).Msg("list documentos failed")

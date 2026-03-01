@@ -9,14 +9,14 @@ defineProps<{
 </script>
 
 <template>
-  <div class="flex items-center gap-2 min-w-0">
+  <div class="flex items-center gap-2 flex-wrap">
     <SharedDataTableFilterSelector
       :columns="columns"
       :filters="filters"
       :actions="actions"
     />
 
-    <div v-if="filters.length > 0" class="flex items-center gap-2 min-w-0 overflow-x-auto no-scrollbar py-1">
+    <div v-if="filters.length > 0" class="flex items-center gap-2 flex-wrap py-1">
       <SharedDataTableFilterChip
         v-for="filter in filters"
         :key="filter.columnId"
@@ -29,11 +29,10 @@ defineProps<{
 
     <UButton
       v-if="filters.length > 0"
-      color="neutral"
-      variant="ghost"
-      size="sm"
+      color="error"
+      variant="soft"
       icon="i-lucide-x"
-      class="h-7 shrink-0"
+      class="shrink-0"
       @click="actions.clearAll()"
     />
   </div>

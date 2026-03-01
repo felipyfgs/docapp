@@ -7,6 +7,8 @@ const props = defineProps<{
   actions: DataTableFilterActions
 }>()
 
+const filtersAsArray = computed(() => [props.filter])
+
 const search = ref('')
 
 const allOptions = computed(() => toValue(props.column.options) ?? [])
@@ -38,7 +40,15 @@ function toggleOption(value: string) {
 </script>
 
 <template>
-  <div class="w-72">
+  <div v-if="column.type === 'timerange'" class="w-72 p-3">
+    <SharedDataTableFilterTimerange
+      :column="column"
+      :filters="filtersAsArray"
+      :actions="actions"
+    />
+  </div>
+
+  <div v-else class="w-72">
     <div class="p-2 border-b border-default">
       <UInput
         v-model="search"

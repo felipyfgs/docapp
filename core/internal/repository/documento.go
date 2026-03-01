@@ -14,13 +14,15 @@ import (
 )
 
 type DocumentoListFilter struct {
-	Search    string
-	Tipo      string
-	Status    string
-	EmpresaID uint
-	XMLResumo *bool
-	Page      int
-	PageSize  int
+	Search     string
+	Tipo       string
+	Status     string
+	EmpresaID  uint
+	XMLResumo  *bool
+	DataInicio *time.Time
+	DataFim    *time.Time
+	Page       int
+	PageSize   int
 }
 
 type DocumentoRepository struct {
@@ -592,6 +594,14 @@ func applyDocumentoFilters(query *bun.SelectQuery, filter DocumentoListFilter) *
 	if search := strings.TrimSpace(filter.Search); search != "" {
 		like := "%" + strings.ToLower(search) + "%"
 		query = query.Where("LOWER(df.search_text) LIKE ?", like)
+	}
+
+	if filter.DataInicio != nil {
+		query = query.Where("df.data_emissao >= ?", *filter.DataInicio)
+	}
+
+	if filter.DataFim != nil {
+		query = query.Where("df.data_emissao <= ?", *filter.DataFim)
 	}
 
 	return query

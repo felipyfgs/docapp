@@ -32,6 +32,10 @@ const operatorOptions = computed(() => {
 const valuesLabel = computed(() => {
   const vals = props.filter.values
   if (vals.length === 0) return '...'
+  if (props.column.type === 'timerange' && vals.length === 2) {
+    const fmt = (v: string) => new Date(v + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return `${fmt(vals[0]!)} – ${fmt(vals[1]!)}`
+  }
   if (props.column.type === 'option') {
     const options = toValue(props.column.options) ?? []
     const selected = options.filter(o => vals.includes(o.value))
@@ -47,32 +51,34 @@ const valueOpen = ref(false)
 </script>
 
 <template>
-  <div class="flex h-7 items-center rounded-full border border-border bg-background shadow-xs text-xs whitespace-nowrap">
+  <div class="flex h-8 items-center rounded-full border border-border bg-background shadow-xs text-sm whitespace-nowrap">
     <div class="flex items-center gap-1 px-2.5 select-none">
-      <UIcon :name="column.icon" class="size-3.5 text-muted" />
+      <UIcon :name="column.icon" class="size-4 text-muted" />
       <span class="font-medium text-default">{{ column.displayName }}</span>
     </div>
 
-    <div class="w-px self-stretch bg-border" />
+    <template v-if="column.type !== 'timerange'">
+      <div class="w-px self-stretch bg-border" />
 
-    <UPopover v-model:open="operatorOpen" :content="{ align: 'start', side: 'bottom' }">
-      <button class="px-2 h-full hover:bg-elevated/80 text-muted transition-colors">
-        {{ operatorLabel }}
-      </button>
-      <template #content>
-        <ul class="py-1 w-36">
-          <li
-            v-for="op in operatorOptions"
-            :key="op.value"
-            class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-elevated rounded-sm mx-1"
-            :class="filter.operator === op.value ? 'text-primary font-medium' : ''"
-            @click="() => { actions.setFilterOperator(filter.columnId, op.value); operatorOpen = false }"
-          >
-            {{ op.label }}
-          </li>
-        </ul>
-      </template>
-    </UPopover>
+      <UPopover v-model:open="operatorOpen" :content="{ align: 'start', side: 'bottom' }">
+        <button class="px-2 h-full hover:bg-elevated/80 text-muted transition-colors">
+          {{ operatorLabel }}
+        </button>
+        <template #content>
+          <ul class="py-1 w-36">
+            <li
+              v-for="op in operatorOptions"
+              :key="op.value"
+              class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer hover:bg-elevated rounded-sm mx-1"
+              :class="filter.operator === op.value ? 'text-primary font-medium' : ''"
+              @click="() => { actions.setFilterOperator(filter.columnId, op.value); operatorOpen = false }"
+            >
+              {{ op.label }}
+            </li>
+          </ul>
+        </template>
+      </UPopover>
+    </template>
 
     <div class="w-px self-stretch bg-border" />
 
@@ -91,7 +97,7 @@ const valueOpen = ref(false)
       class="px-2 h-full hover:bg-elevated/80 rounded-r-full transition-colors text-muted hover:text-default"
       @click="actions.removeFilter(filter.columnId)"
     >
-      <UIcon name="i-lucide-x" class="size-3.5" />
+      <UIcon name="i-lucide-x" class="size-4" />
     </button>
   </div>
 </template>

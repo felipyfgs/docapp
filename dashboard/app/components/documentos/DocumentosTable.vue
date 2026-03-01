@@ -30,8 +30,6 @@ const columnVisibility = ref<Record<string, boolean>>({
 const rowSelection = ref<Record<string, boolean>>({})
 const pagination = ref({ pageIndex: 0, pageSize: 15 })
 
-const search = ref('')
-
 function dynamicOptions(extractor: (d: DocumentoFiscal) => string | undefined) {
   const all = [...new Set((props.data ?? []).map(extractor).filter(Boolean))]
   return all.sort().map(v => ({ label: v!, value: v! }))
@@ -69,9 +67,17 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
     id: 'emitente',
     accessor: row => row.emitente_nome || '',
     displayName: 'Emitente',
-    icon: 'i-lucide-building',
+    icon: 'i-lucide-building-2',
     type: 'option',
     options: dynamicOptions(d => d.emitente_nome || undefined)
+  },
+  {
+    id: 'destinatario',
+    accessor: row => row.destinatario_cnpj || '',
+    displayName: 'Destinatário',
+    icon: 'i-lucide-building',
+    type: 'option',
+    options: dynamicOptions(d => d.destinatario_cnpj || undefined)
   },
   {
     id: 'manifestacao_status',
@@ -85,6 +91,25 @@ const filterColumns = computed<ColumnConfig<DocumentoFiscal>[]>(() => [
       { label: 'Confirmada', value: 'confirmada' },
       { label: 'Desconhecida', value: 'desconhecida' },
       { label: 'Não Realizada', value: 'nao_realizada' }
+    ]
+  },
+  {
+    id: 'competencia',
+    accessor: row => row.competencia || '',
+    displayName: 'Competência',
+    icon: 'i-lucide-calendar-range',
+    type: 'option',
+    options: dynamicOptions(d => d.competencia || undefined)
+  },
+  {
+    id: 'xml_resumo',
+    accessor: row => row.xml_resumo ? 'resumo' : 'completo',
+    displayName: 'XML',
+    icon: 'i-lucide-file-code-2',
+    type: 'option',
+    options: [
+      { label: 'Completo', value: 'completo' },
+      { label: 'Resumo', value: 'resumo' }
     ]
   }
 ])
@@ -106,18 +131,7 @@ watch(() => props.data, (data) => {
   initialFilterApplied.value = true
 }, { immediate: true })
 
-const filtered = computed(() => {
-  const q = search.value.toLowerCase()
-  if (!q) return filteredData.value
-
-  return filteredData.value.filter(d =>
-    d.chave_acesso?.includes(q)
-    || d.emitente_nome?.toLowerCase().includes(q)
-    || d.emitente_cnpj?.includes(q)
-    || d.destinatario_cnpj?.includes(q)
-    || d.numero_documento?.toString().includes(q)
-  )
-})
+const filtered = computed(() => filteredData.value)
 
 const selectedRows = computed((): DocumentoFiscal[] => {
   if (!table.value?.tableApi) return []
@@ -295,19 +309,11 @@ const columnLabels: Record<string, string> = {
 </script>
 
 <template>
-  <div class="flex items-center gap-2">
-    <UInput
-      v-model="search"
-      icon="i-lucide-search"
-      placeholder="Filtrar por chave, emitente, CNPJ..."
-      class="w-64 shrink-0"
-    />
-
+  <div class="flex items-center gap-2 flex-wrap">
     <SharedDataTableFilter
       :columns="filterColumns"
       :filters="filters"
       :actions="filterActions"
-      class="min-w-0"
     />
 
     <div class="flex items-center gap-2 ml-auto shrink-0">

@@ -3,7 +3,7 @@ import type { DocumentoFiscal, DocumentoExportResponse } from '~/types'
 
 type DeliveryMode = 'proxy' | 'presigned'
 type ExportFormat = 'xml' | 'danfe' | 'ambos'
-type OrganizationMode = 'tipo/competencia/cnpj' | 'cnpj/competencia/tipo' | 'competencia/cnpj/tipo'
+type OrganizationMode = 'cnpj/ano/mes' | 'ano/mes/cnpj'
 
 const props = defineProps<{
   selectedRows: DocumentoFiscal[]
@@ -13,7 +13,7 @@ const toast = useToast()
 const open = ref(false)
 const exporting = ref(false)
 const exportFormat = ref<ExportFormat>('xml')
-const exportOrganization = ref<OrganizationMode>('tipo/competencia/cnpj')
+const exportOrganization = ref<OrganizationMode>('cnpj/ano/mes')
 const exportDeliveryMode = ref<DeliveryMode>('proxy')
 
 function show() {
@@ -111,9 +111,8 @@ defineExpose({ show })
           <USelect
             v-model="exportOrganization"
             :items="[
-              { label: 'tipo/competencia/cnpj', value: 'tipo/competencia/cnpj' },
-              { label: 'cnpj/competencia/tipo', value: 'cnpj/competencia/tipo' },
-              { label: 'competencia/cnpj/tipo', value: 'competencia/cnpj/tipo' }
+              { label: 'CNPJ / ANO / MES', value: 'cnpj/ano/mes' },
+              { label: 'ANO / MES / CNPJ', value: 'ano/mes/cnpj' }
             ]"
             class="w-full"
           />

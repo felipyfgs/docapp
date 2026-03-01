@@ -27,13 +27,15 @@ const (
 )
 
 type DocumentoListFilter struct {
-	Search    string
-	Tipo      string
-	Status    string
-	EmpresaID uint
-	XMLResumo *bool
-	Page      int
-	PageSize  int
+	Search     string
+	Tipo       string
+	Status     string
+	EmpresaID  uint
+	XMLResumo  *bool
+	DataInicio *time.Time
+	DataFim    *time.Time
+	Page       int
+	PageSize   int
 }
 
 type DocumentoExportOptions struct {
@@ -74,13 +76,15 @@ func NewDocumentoService(repo *repository.DocumentoRepository, itemRepo *reposit
 
 func (s *DocumentoService) List(filter DocumentoListFilter) ([]model.DocumentoFiscal, int64, error) {
 	return s.repo.List(context.Background(), repository.DocumentoListFilter{
-		Search:    filter.Search,
-		Tipo:      filter.Tipo,
-		Status:    filter.Status,
-		EmpresaID: filter.EmpresaID,
-		XMLResumo: filter.XMLResumo,
-		Page:      filter.Page,
-		PageSize:  filter.PageSize,
+		Search:     filter.Search,
+		Tipo:       filter.Tipo,
+		Status:     filter.Status,
+		EmpresaID:  filter.EmpresaID,
+		XMLResumo:  filter.XMLResumo,
+		DataInicio: filter.DataInicio,
+		DataFim:    filter.DataFim,
+		Page:       filter.Page,
+		PageSize:   filter.PageSize,
 	})
 }
 
@@ -133,7 +137,7 @@ func (s *DocumentoService) Export(ctx context.Context, opts DocumentoExportOptio
 	}
 
 	now := time.Now()
-	fileName := fmt.Sprintf("documentos_%s.zip", now.Format("20060102_150405"))
+	fileName := buildExportFileName(organization, docs, now)
 
 	buf := bytes.NewBuffer(nil)
 	zipWriter := zip.NewWriter(buf)
@@ -386,34 +390,88 @@ func normalizeDeliveryMode(mode string) string {
 func normalizeOrganization(organization string) string {
 	value := strings.ToLower(strings.TrimSpace(organization))
 	switch value {
-	case "tipo/competencia/cnpj", "cnpj/competencia/tipo", "competencia/cnpj/tipo":
+	case "cnpj/ano/mes", "ano/mes/cnpj":
 		return value
 	default:
-		return "tipo/competencia/cnpj"
+		return "cnpj/ano/mes"
 	}
 }
 
+func buildExportFileName(organization string, docs []model.DocumentoFiscal, now time.Time) string {
+	cnpjSet := make(map[string]struct{})
+	for _, doc := range docs {
+		c := ""
+		if doc.Empresa != nil {
+			c = doc.Empresa.CNPJ
+		}
+		if c == "" {
+			c = firstNonEmpty(doc.DestinatarioCNPJ, doc.EmitenteCNPJ)
+		}
+		if c != "" {
+			cnpjSet[c] = struct{}{}
+		}
+	}
+
+	cnpjPart := "DIVERSOS"
+	if len(cnpjSet) == 1 {
+		for k := range cnpjSet {
+			cnpjPart = k
+		}
+	}
+
+	ano := now.Format("2006")
+	mes := strings.ToUpper(monthNames[now.Format("01")])
+	if mes == "" {
+		mes = now.Format("01")
+	}
+
+	switch organization {
+	case "ano/mes/cnpj":
+		return fmt.Sprintf("%s_%s_%s.zip", ano, mes, cnpjPart)
+	default:
+		return fmt.Sprintf("%s_%s_%s.zip", cnpjPart, ano, mes)
+	}
+}
+
+var monthNames = map[string]string{
+	"01": "JANEIRO", "02": "FEVEREIRO", "03": "MARCO", "04": "ABRIL",
+	"05": "MAIO", "06": "JUNHO", "07": "JULHO", "08": "AGOSTO",
+	"09": "SETEMBRO", "10": "OUTUBRO", "11": "NOVEMBRO", "12": "DEZEMBRO",
+}
+
+func competenciaToAnoParts(competencia string) (string, string) {
+	parts := strings.SplitN(competencia, "-", 2)
+	if len(parts) != 2 {
+		return "SEM_ANO", "SEM_MES"
+	}
+	ano := parts[0]
+	mes := monthNames[parts[1]]
+	if mes == "" {
+		mes = "SEM_MES"
+	}
+	return ano, mes
+}
+
 func buildExportPath(organization string, doc model.DocumentoFiscal, extension string) string {
-	tipo := sanitizePathPart(firstNonEmpty(doc.TipoDocumento, "desconhecido"))
-	competencia := sanitizePathPart(firstNonEmpty(doc.Competencia, "sem_competencia"))
+	competencia := firstNonEmpty(doc.Competencia, "sem_competencia")
+	ano, mes := competenciaToAnoParts(competencia)
+
 	empresaCNPJ := ""
 	if doc.Empresa != nil {
 		empresaCNPJ = doc.Empresa.CNPJ
 	}
-	cnpj := sanitizePathPart(firstNonEmpty(empresaCNPJ, doc.DestinatarioCNPJ, doc.EmitenteCNPJ, "sem_cnpj"))
+	cnpj := strings.ToUpper(sanitizePathPart(firstNonEmpty(empresaCNPJ, doc.DestinatarioCNPJ, doc.EmitenteCNPJ, "sem_cnpj")))
 
 	var dir string
 	switch organization {
-	case "cnpj/competencia/tipo":
-		dir = path.Join(cnpj, competencia, tipo)
-	case "competencia/cnpj/tipo":
-		dir = path.Join(competencia, cnpj, tipo)
+	case "ano/mes/cnpj":
+		dir = path.Join(ano, mes, cnpj)
 	default:
-		dir = path.Join(tipo, competencia, cnpj)
+		dir = path.Join(cnpj, ano, mes)
 	}
 
-	fileBase := sanitizeFileName(firstNonEmpty(doc.ChaveAcesso, doc.NumeroDocumento, doc.NSU, fmt.Sprintf("doc_%d", doc.ID)))
-	return path.Join(dir, fileBase+"."+extension)
+	fileBase := strings.ToUpper(sanitizeFileName(firstNonEmpty(doc.ChaveAcesso, doc.NumeroDocumento, doc.NSU, fmt.Sprintf("doc_%d", doc.ID))))
+	return path.Join(dir, fileBase+"."+strings.ToUpper(extension))
 }
 
 func writeZipFile(zipWriter *zip.Writer, filePath string, content []byte) error {

@@ -44,14 +44,14 @@ sped/.phpunit.cache
 sped/.phpunit.result.cache
 sped/auth.json
 
-# Node / Nuxt (web)
-web/node_modules/
-web/.nuxt/
-web/.output/
-web/.nitro/
-web/.cache/
-web/dist/
-web/logs/
+# Node / Nuxt (dashboard)
+dashboard/node_modules/
+dashboard/.nuxt/
+dashboard/.output/
+dashboard/.nitro/
+dashboard/.cache/
+dashboard/dist/
+dashboard/logs/
 
 # Certificates at root
 core/certs/*.pfx

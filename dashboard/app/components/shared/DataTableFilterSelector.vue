@@ -80,8 +80,6 @@ watch(open, (val) => {
       variant="outline"
       icon="i-lucide-filter"
       :label="hasFilters ? undefined : 'Filtrar'"
-      size="sm"
-      class="h-7"
     />
 
     <template #content>
